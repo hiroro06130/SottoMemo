@@ -31,4 +31,8 @@ public class MemoViewModel extends AndroidViewModel {
     public void delete(Memo memo) {
         mRepository.delete(memo);
     }
+    // MainActivityがこのメソッドを使って複数のメモを削除する
+    public void deleteMemos(List<Memo> memos) {
+        mRepository.deleteMemos(memos);
+    }
 }

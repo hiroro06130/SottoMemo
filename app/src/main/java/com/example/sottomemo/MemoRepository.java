@@ -36,4 +36,10 @@ public class MemoRepository {
             mMemoDao.delete(memo);
         });
     }
+    // 複数のメモをまとめて「削除」するメソッド
+    void deleteMemos(List<Memo> memos) {
+        MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
+            mMemoDao.deleteMemos(memos);
+        });
+    }
 }
