@@ -25,10 +25,15 @@ public class MemoRepository {
         });
     }
 
-    // このメソッドが不足していました
     void update(Memo memo) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
             mMemoDao.update(memo);
+        });
+    }
+
+    void delete(Memo memo) {
+        MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
+            mMemoDao.delete(memo);
         });
     }
 }

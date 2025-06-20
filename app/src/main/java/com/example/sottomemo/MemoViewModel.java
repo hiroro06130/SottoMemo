@@ -24,8 +24,11 @@ public class MemoViewModel extends AndroidViewModel {
         mRepository.insert(memo);
     }
 
-    // このupdateメソッドが不足していました
     public void update(Memo memo) {
         mRepository.update(memo);
+    }
+
+    public void delete(Memo memo) {
+        mRepository.delete(memo);
     }
 }

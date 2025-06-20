@@ -2,11 +2,14 @@ package com.example.sottomemo;
 
 import android.content.Intent;
 import android.os.Bundle;
-
+import android.widget.Toast;
+import android.app.AlertDialog;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -37,9 +40,7 @@ public class MainActivity extends AppCompatActivity {
 
         // --- ViewModelのセットアップ ---
         mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
-        mMemoViewModel.getAllMemos().observe(this, memos -> {
-            memoAdapter.submitList(memos);
-        });
+        mMemoViewModel.getAllMemos().observe(this, memos -> memoAdapter.submitList(memos));
 
         // --- 結果受け取りランチャーのセットアップ ---
         memoEditLauncher = registerForActivityResult(
@@ -73,7 +74,6 @@ public class MainActivity extends AppCompatActivity {
             memoEditLauncher.launch(intent);
         });
 
-        // ★★★ おそらく、この部分が抜けています ★★★
         // --- Adapterのクリックリスナーをセットアップ（編集処理） ---
         memoAdapter.setOnItemClickListener(memo -> {
             Intent intent = new Intent(MainActivity.this, MemoEditActivity.class);
@@ -82,5 +82,38 @@ public class MainActivity extends AppCompatActivity {
             intent.putExtra(MemoEditActivity.EXTRA_EXCERPT, memo.getExcerpt());
             memoEditLauncher.launch(intent);
         });
+
+        // --- スワイプして削除する機能を追加 ---
+        new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0,
+                ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                return false;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                // スワイプされたアイテムの位置を取得
+                final int position = viewHolder.getAdapterPosition();
+                // アダプターに、スワイプされたビューを元の位置に戻すよう通知する
+                // これをしないと、キャンセルしたときにアイテムが消えたままになる
+                memoAdapter.notifyItemChanged(position);
+
+                // 確認ダイアログを作成して表示
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("削除の確認")
+                        .setMessage("このメモを削除しますか？")
+                        .setPositiveButton("はい", (dialog, which) -> {
+                            // 「はい」が押されたときの処理
+                            // その位置にあるメモオブジェクトをAdapterから取得
+                            Memo memoToDelete = memoAdapter.getCurrentList().get(position);
+                            // ViewModelに削除を依頼
+                            mMemoViewModel.delete(memoToDelete);
+                            Toast.makeText(MainActivity.this, "メモを削除しました", Toast.LENGTH_SHORT).show();
+                        })
+                        .setNegativeButton("いいえ", null) // 「いいえ」が押されたときは何もしない（ダイアログが閉じるだけ）
+                        .show();
+            }
+        }).attachToRecyclerView(recyclerView);
     }
 }

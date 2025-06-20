@@ -2,10 +2,11 @@ package com.example.sottomemo;
 
 import androidx.lifecycle.LiveData;
 import androidx.room.Dao;
+import androidx.room.Delete;
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
-import androidx.room.Update; // @Updateのインポートを追加
+import androidx.room.Update;
 
 import java.util.List;
 
@@ -15,9 +16,11 @@ public interface MemoDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     void insert(Memo memo);
 
-    // このメソッドが不足していました
     @Update
     void update(Memo memo);
+
+    @Delete
+    void delete(Memo memo);
 
     @Query("SELECT * FROM memo_table ORDER BY last_modified DESC")
     LiveData<List<Memo>> getAllMemos();
