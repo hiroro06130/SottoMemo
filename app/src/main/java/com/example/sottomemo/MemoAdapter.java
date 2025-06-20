@@ -8,29 +8,36 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
-// ListAdapterを継承するように変更
 public class MemoAdapter extends ListAdapter<Memo, MemoAdapter.MemoViewHolder> {
 
-    // ListAdapterを使うためのコンストラクタ
+    private OnItemClickListener listener;
+
+    public interface OnItemClickListener {
+        void onItemClick(Memo memo);
+    }
+
+    public void setOnItemClickListener(OnItemClickListener listener) {
+        this.listener = listener;
+    }
+
     public MemoAdapter() {
         super(DIFF_CALLBACK);
     }
 
-    // 2つのリストの差分を計算するための「設計図」
-    // これがあるおかげで、リストの更新が非常に効率的になる
     private static final DiffUtil.ItemCallback<Memo> DIFF_CALLBACK = new DiffUtil.ItemCallback<Memo>() {
         @Override
         public boolean areItemsTheSame(@NonNull Memo oldItem, @NonNull Memo newItem) {
-            // IDが同じなら、同じアイテムと見なす
             return oldItem.getId() == newItem.getId();
         }
 
         @Override
         public boolean areContentsTheSame(@NonNull Memo oldItem, @NonNull Memo newItem) {
-            // タイトルと日付が同じなら、内容も同じと見なす
-            return oldItem.getTitle().equals(newItem.getTitle()) &&
-                    oldItem.getDate().equals(newItem.getDate());
+            return oldItem.getExcerpt().equals(newItem.getExcerpt()) &&
+                    oldItem.getLastModified() == newItem.getLastModified();
         }
     };
 
@@ -44,15 +51,16 @@ public class MemoAdapter extends ListAdapter<Memo, MemoAdapter.MemoViewHolder> {
 
     @Override
     public void onBindViewHolder(@NonNull MemoViewHolder holder, int position) {
-        // 表示するデータを取得する方法が、getItem(position)に変わる
         Memo currentMemo = getItem(position);
         holder.textViewTitle.setText(currentMemo.getTitle());
         holder.textViewExcerpt.setText(currentMemo.getExcerpt());
-        holder.textViewDate.setText(currentMemo.getDate());
+
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault());
+        String formattedDate = sdf.format(new Date(currentMemo.getLastModified()));
+        holder.textViewDate.setText(formattedDate);
     }
 
-    // ViewHolderクラス（変更なし）
-    public static class MemoViewHolder extends RecyclerView.ViewHolder {
+    public class MemoViewHolder extends RecyclerView.ViewHolder {
         public TextView textViewTitle;
         public TextView textViewExcerpt;
         public TextView textViewDate;
@@ -62,6 +70,13 @@ public class MemoAdapter extends ListAdapter<Memo, MemoAdapter.MemoViewHolder> {
             textViewTitle = itemView.findViewById(R.id.text_view_title);
             textViewExcerpt = itemView.findViewById(R.id.text_view_excerpt);
             textViewDate = itemView.findViewById(R.id.text_view_date);
+
+            itemView.setOnClickListener(v -> {
+                int position = getAdapterPosition();
+                if (listener != null && position != RecyclerView.NO_POSITION) {
+                    listener.onItemClick(getItem(position));
+                }
+            });
         }
     }
 }

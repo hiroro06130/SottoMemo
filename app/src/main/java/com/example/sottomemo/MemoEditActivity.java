@@ -1,60 +1,59 @@
 package com.example.sottomemo;
 
-import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
-import android.widget.Toast; // Toastをインポート
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
 
 public class MemoEditActivity extends AppCompatActivity {
 
-    // データの受け渡しに使う「キー」を定義しておきます。
-    // こうすることで、タイプミスを防げます。
-    public static final String EXTRA_NEW_MEMO_TEXT = "com.example.sottomemo.EXTRA_NEW_MEMO_TEXT";
+    // このキーの定義が不足していました
+    public static final String EXTRA_ID = "com.example.sottomemo.EXTRA_ID";
+    public static final String EXTRA_TITLE = "com.example.sottomemo.EXTRA_TITLE";
+    public static final String EXTRA_EXCERPT = "com.example.sottomemo.EXTRA_EXCERPT";
 
-    // 1. レイアウト上の部品を操作するための変数を宣言
     private EditText editTextMemo;
     private TextView buttonSave;
+    private int currentMemoId = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_memo_edit);
 
-        // 2. 変数とレイアウト上の部品をIDで結びつける
         editTextMemo = findViewById(R.id.edit_text_memo);
         buttonSave = findViewById(R.id.button_save);
 
-        // 3. 「保存」ボタンがクリックされたときの処理を設定
-        buttonSave.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                saveMemo(); // 保存処理をするメソッドを呼び出す
-            }
-        });
+        Intent intent = getIntent();
+        if (intent.hasExtra(EXTRA_ID)) {
+            setTitle("メモの編集");
+            currentMemoId = intent.getIntExtra(EXTRA_ID, -1);
+            String excerpt = intent.getStringExtra(EXTRA_EXCERPT);
+            editTextMemo.setText(excerpt);
+        } else {
+            setTitle("新しいメモ");
+        }
+
+        buttonSave.setOnClickListener(v -> saveMemo());
     }
 
-    // 保存処理を行うメソッド
     private void saveMemo() {
-        // 4. EditTextから入力されたテキストを取得
         String memoText = editTextMemo.getText().toString();
-
-        // 5. テキストが空っぽでないかチェック
         if (memoText.trim().isEmpty()) {
-            // もし空なら、メッセージを表示して処理を中断
             Toast.makeText(this, "メモが入力されていません", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // 6. データを返すための「小包」となるIntentを作成
         Intent resultIntent = new Intent();
-        // 7. 小包に、品名ラベル(キー)を付けて、品物(入力されたテキスト)を入れる
-        resultIntent.putExtra(EXTRA_NEW_MEMO_TEXT, memoText);
-        // 8. 「返送準備OK」の印と、小包(Intent)をセットする
+        resultIntent.putExtra(EXTRA_EXCERPT, memoText);
+
+        if (currentMemoId != -1) {
+            resultIntent.putExtra(EXTRA_ID, currentMemoId);
+        }
+
         setResult(RESULT_OK, resultIntent);
-        // 9. この画面を閉じる（自動的に前の画面に戻る）
         finish();
     }
 }

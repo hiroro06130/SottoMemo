@@ -5,7 +5,6 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import java.util.List;
 
-// AndroidViewModelを継承するのがポイント
 public class MemoViewModel extends AndroidViewModel {
 
     private MemoRepository mRepository;
@@ -17,13 +16,16 @@ public class MemoViewModel extends AndroidViewModel {
         mAllMemos = mRepository.getAllMemos();
     }
 
-    // MainActivityがこのメソッドを使って最新のメモリストを取得する
     LiveData<List<Memo>> getAllMemos() {
         return mAllMemos;
     }
 
-    // MainActivityがこのメソッドを使って新しいメモをデータベースに追加する
     public void insert(Memo memo) {
         mRepository.insert(memo);
+    }
+
+    // このupdateメソッドが不足していました
+    public void update(Memo memo) {
+        mRepository.update(memo);
     }
 }

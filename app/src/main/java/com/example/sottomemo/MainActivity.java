@@ -20,12 +20,8 @@ public class MainActivity extends AppCompatActivity {
 
     private RecyclerView recyclerView;
     private FloatingActionButton fabNewMemo;
-
-    // ViewModelの変数を宣言
     private MemoViewModel mMemoViewModel;
-    // Adapterの変数を宣言
     private MemoAdapter memoAdapter;
-
     private ActivityResultLauncher<Intent> memoEditLauncher;
 
     @Override
@@ -35,19 +31,13 @@ public class MainActivity extends AppCompatActivity {
 
         // --- RecyclerViewとAdapterのセットアップ ---
         recyclerView = findViewById(R.id.recycler_view_memos);
-        // 新しくなったAdapterをここで生成
         memoAdapter = new MemoAdapter();
         recyclerView.setAdapter(memoAdapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
         // --- ViewModelのセットアップ ---
-        // ViewModelを取得
         mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
-
-        // ViewModel内のデータ（getAllMemos）を「監視」する
-        // データベースのデータに変更があると、中の処理が自動で実行される
         mMemoViewModel.getAllMemos().observe(this, memos -> {
-            // 新しいメモのリストをAdapterに渡して、画面を更新
             memoAdapter.submitList(memos);
         });
 
@@ -56,22 +46,40 @@ public class MainActivity extends AppCompatActivity {
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        String newMemoText = result.getData().getStringExtra(MemoEditActivity.EXTRA_NEW_MEMO_TEXT);
-                        if (newMemoText != null && !newMemoText.isEmpty()) {
-                            // 新しいメモをデータベースに追加するよう、ViewModelにお願いする
-                            String title = newMemoText.split("\n")[0];
-                            SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault());
-                            String currentDate = sdf.format(new Date());
-                            Memo newMemo = new Memo(title, newMemoText, currentDate);
-                            mMemoViewModel.insert(newMemo);
+                        Intent data = result.getData();
+                        int id = data.getIntExtra(MemoEditActivity.EXTRA_ID, -1);
+                        String memoText = data.getStringExtra(MemoEditActivity.EXTRA_EXCERPT);
+
+                        if (memoText != null && !memoText.isEmpty()) {
+                            String title = memoText.split("\n")[0];
+                            long currentTime = System.currentTimeMillis();
+
+                            if (id == -1) { // 新規作成
+                                Memo newMemo = new Memo(title, memoText, currentTime);
+                                mMemoViewModel.insert(newMemo);
+                            } else { // 更新
+                                Memo updatedMemo = new Memo(title, memoText, currentTime);
+                                updatedMemo.setId(id);
+                                mMemoViewModel.update(updatedMemo);
+                            }
                         }
                     }
                 });
 
-        // --- FABのセットアップ ---
+        // --- FABのセットアップ（新規作成ボタンの処理） ---
         fabNewMemo = findViewById(R.id.fab_new_memo);
         fabNewMemo.setOnClickListener(v -> {
             Intent intent = new Intent(MainActivity.this, MemoEditActivity.class);
+            memoEditLauncher.launch(intent);
+        });
+
+        // ★★★ おそらく、この部分が抜けています ★★★
+        // --- Adapterのクリックリスナーをセットアップ（編集処理） ---
+        memoAdapter.setOnItemClickListener(memo -> {
+            Intent intent = new Intent(MainActivity.this, MemoEditActivity.class);
+            intent.putExtra(MemoEditActivity.EXTRA_ID, memo.getId());
+            intent.putExtra(MemoEditActivity.EXTRA_TITLE, memo.getTitle());
+            intent.putExtra(MemoEditActivity.EXTRA_EXCERPT, memo.getExcerpt());
             memoEditLauncher.launch(intent);
         });
     }
