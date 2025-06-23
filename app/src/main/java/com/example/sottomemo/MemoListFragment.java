@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,7 +17,10 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.view.ActionMode;
+import androidx.appcompat.widget.SearchView;
+import androidx.core.view.MenuProvider;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Lifecycle;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -79,6 +83,8 @@ public class MemoListFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        // このフラグメントがメニューを持つことをシステムに知らせる
+        setHasOptionsMenu(true);
         return inflater.inflate(R.layout.fragment_memo_list, container, false);
     }
 
@@ -93,7 +99,9 @@ public class MemoListFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
         mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
-        mMemoViewModel.getAllMemos().observe(getViewLifecycleOwner(), memos -> memoAdapter.submitList(memos));
+        mMemoViewModel.getFilteredMemos().observe(getViewLifecycleOwner(), memos -> {
+            memoAdapter.submitList(memos);
+        });
 
         memoEditLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
@@ -122,19 +130,56 @@ public class MemoListFragment extends Fragment {
             memoEditLauncher.launch(intent);
         });
 
+        // メニューのセットアップは、より新しい addMenuProvider を使った方法に変更します
+        setupMenuProvider();
         setupClickListeners();
         setupSwipeToDelete();
+    }
+
+    // フラグメントでのメニューの扱いの、よりモダンな方法
+    private void setupMenuProvider() {
+        requireActivity().addMenuProvider(new MenuProvider() {
+            @Override
+            public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
+                menuInflater.inflate(R.menu.memo_list_menu, menu);
+
+                MenuItem searchItem = menu.findItem(R.id.action_search);
+                SearchView searchView = (SearchView) searchItem.getActionView();
+
+                searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                    @Override
+                    public boolean onQueryTextSubmit(String query) {
+                        return false;
+                    }
+                    @Override
+                    public boolean onQueryTextChange(String newText) {
+                        mMemoViewModel.setSearchQuery(newText);
+                        return true;
+                    }
+                });
+            }
+
+            @Override
+            public boolean onMenuItemSelected(@NonNull MenuItem menuItem) {
+                // ★★★ ここが今回の修正点です ★★★
+                if (menuItem.getItemId() == R.id.action_settings) {
+                    // 設定アイコンが押されたら、SettingsActivityを開く
+                    Intent intent = new Intent(requireActivity(), SettingsActivity.class);
+                    startActivity(intent);
+                    return true;
+                }
+                return false;
+            }
+        }, getViewLifecycleOwner(), Lifecycle.State.RESUMED);
     }
 
     private void setupClickListeners() {
         memoAdapter.setOnItemClickListener(memo -> {
             if (mActionMode != null) {
                 memoAdapter.toggleSelection(memo);
-                if (mActionMode != null) { // selection might have been cleared
-                    mActionMode.invalidate();
-                }
+                mActionMode.invalidate();
             } else {
-                Intent intent = new Intent(requireActivity(), MemoEditActivity.class);
+                Intent intent = new Intent(requireActivity(), SettingsActivity.class);
                 intent.putExtra(MemoEditActivity.EXTRA_ID, memo.getId());
                 intent.putExtra(MemoEditActivity.EXTRA_TITLE, memo.getTitle());
                 intent.putExtra(MemoEditActivity.EXTRA_EXCERPT, memo.getExcerpt());

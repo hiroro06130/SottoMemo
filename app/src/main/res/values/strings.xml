@@ -1,3 +1,14 @@
 <resources>
     <string name="app_name">Sotto Memo</string>
+    <string-array name="theme_entries">
+        <item>ライト</item>
+        <item>ダーク</item>
+        <item>システムのデフォルト</item>
+    </string-array>
+
+    <string-array name="theme_values">
+        <item>light</item>
+        <item>dark</item>
+        <item>system</item>
+    </string-array>
 </resources>

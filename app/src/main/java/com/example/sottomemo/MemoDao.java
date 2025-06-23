@@ -22,12 +22,15 @@ public interface MemoDao {
     @Delete
     void delete(Memo memo);
 
-    // 複数のメモをまとめて削除する命令
     @Delete
     void deleteMemos(List<Memo> memos);
 
     @Query("SELECT * FROM memo_table ORDER BY last_modified DESC")
     LiveData<List<Memo>> getAllMemos();
+
+    // キーワード(searchQuery)を含むメモを、更新日順で検索する命令
+    @Query("SELECT * FROM memo_table WHERE title LIKE :searchQuery OR excerpt LIKE :searchQuery ORDER BY last_modified DESC")
+    LiveData<List<Memo>> searchMemos(String searchQuery);
 
     @Query("DELETE FROM memo_table")
     void deleteAll();

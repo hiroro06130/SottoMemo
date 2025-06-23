@@ -33,14 +33,16 @@ public class MemoRepository {
     void deleteMemos(List<Memo> memos) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> mMemoDao.deleteMemos(memos));
     }
+    // 検索クエリに一致するメモのリストを取得する
+    LiveData<List<Memo>> searchMemos(String searchQuery) {
+        return mMemoDao.searchMemos(searchQuery);
+    }
 
     // --- Todo関連 ---
     LiveData<List<Todo>> getAllTodos() { return mAllTodos; }
-
     void insert(Todo todo) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> mTodoDao.insert(todo));
     }
-
     void update(Todo todo) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> mTodoDao.update(todo));
     }
