@@ -3,19 +3,20 @@ package com.example.sottomemo;
 import android.content.Intent;
 import android.os.Bundle;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class MemoEditActivity extends AppCompatActivity {
 
-    // このキーの定義が不足していました
     public static final String EXTRA_ID = "com.example.sottomemo.EXTRA_ID";
     public static final String EXTRA_TITLE = "com.example.sottomemo.EXTRA_TITLE";
     public static final String EXTRA_EXCERPT = "com.example.sottomemo.EXTRA_EXCERPT";
 
     private EditText editTextMemo;
     private TextView buttonSave;
+    private ImageView buttonBack;
     private int currentMemoId = -1;
 
     @Override
@@ -25,6 +26,7 @@ public class MemoEditActivity extends AppCompatActivity {
 
         editTextMemo = findViewById(R.id.edit_text_memo);
         buttonSave = findViewById(R.id.button_save);
+        buttonBack = findViewById(R.id.button_back);
 
         Intent intent = getIntent();
         if (intent.hasExtra(EXTRA_ID)) {
@@ -37,6 +39,10 @@ public class MemoEditActivity extends AppCompatActivity {
         }
 
         buttonSave.setOnClickListener(v -> saveMemo());
+
+        buttonBack.setOnClickListener(v -> {
+            finish(); // 画面を閉じる
+        });
     }
 
     private void saveMemo() {

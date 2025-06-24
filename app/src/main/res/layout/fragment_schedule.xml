@@ -4,32 +4,36 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/android:colorBackground"
     android:orientation="vertical"
-    android:background="@color/color_base_off_white"
     tools:context=".ScheduleFragment">
 
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tab_layout_schedule"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/color_base_off_white"
-        app:tabIndicatorColor="@color/color_main_mint_green"
-        app:tabTextColor="@color/black"/>
+        android:background="?attr/colorSurface"
+        app:tabIndicatorColor="?attr/colorPrimary"
+        app:tabSelectedTextColor="?attr/colorPrimary"
+        app:tabTextColor="?attr/colorOnSurfaceVariant" />
 
     <LinearLayout
         android:id="@+id/calendar_page_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:visibility="visible"> <CalendarView
-        android:id="@+id/calendar_view"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:visibility="visible">
+
+        <CalendarView
+            android:id="@+id/calendar_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="@color/color_selection_light_gray" />
+            android:alpha="0.12"
+            android:background="?attr/colorOnSurface" />
 
         <TextView
             android:id="@+id/text_view_selected_date_header"
@@ -37,7 +41,7 @@
             android:layout_height="wrap_content"
             android:padding="16dp"
             android:text="予定"
-            android:textColor="@color/black"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="18sp"
             android:textStyle="bold" />
 
@@ -45,19 +49,22 @@
             android:id="@+id/recycler_view_daily_events"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:paddingHorizontal="8dp"/>
+            android:paddingHorizontal="8dp" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/todo_page_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:gravity="center"
         android:orientation="vertical"
-        android:visibility="gone"> <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler_view_todos"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:paddingVertical="8dp" />
+        android:visibility="gone">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_view_todos"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingVertical="8dp" />
 
     </LinearLayout>
 

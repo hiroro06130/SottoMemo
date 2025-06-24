@@ -4,14 +4,15 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/android:colorBackground"
     tools:context=".MemoListFragment">
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view_memos"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="8dp"
         android:clipToPadding="false"
+        android:padding="8dp"
         tools:listitem="@layout/list_item_memo" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -20,11 +21,11 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
+        android:contentDescription="新しいメモを作成"
         android:src="@drawable/ic_add"
         app:backgroundTint="@color/color_accent_baby_pink"
-        app:tint="@color/white"
         app:elevation="6dp"
         app:pressedTranslationZ="12dp"
-        android:contentDescription="新しいメモを作成" />
+        app:tint="@color/white" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

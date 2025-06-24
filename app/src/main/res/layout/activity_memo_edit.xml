@@ -5,13 +5,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/color_base_off_white"
+    android:background="?attr/android:colorBackground"
     tools:context=".MemoEditActivity">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/color_base_off_white"
+        android:background="?attr/colorSurface"
         app:elevation="1dp">
 
         <androidx.appcompat.widget.Toolbar
@@ -19,12 +19,22 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize">
 
+            <ImageView
+                android:id="@+id/button_back"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:src="@drawable/ic_arrow_back"
+                android:paddingHorizontal="16dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="戻る"
+                app:tint="?attr/colorOnSurface" />
+
             <TextView
                 android:id="@+id/button_save"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="保存"
-                android:textColor="@color/black"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:padding="10dp"
@@ -45,8 +55,8 @@
         android:hint="例：来週水曜 14時に渋谷で田中さんと打ち合わせ"
         android:inputType="textMultiLine"
         android:padding="16dp"
-        android:textColor="@color/black"
-        android:textColorHint="@color/gray_text"
+        android:textColor="?attr/colorOnSurface"
+        android:textColorHint="?attr/colorOnSurfaceVariant"
         android:textSize="16sp"
         android:importantForAutofill="no" />
 

@@ -11,7 +11,7 @@
         android:id="@+id/view_category_bar"
         android:layout_width="4dp"
         android:layout_height="match_parent"
-        android:background="@color/color_main_mint_green" />
+        android:background="?attr/colorPrimary" />
 
     <TextView
         android:id="@+id/text_view_event_time"
@@ -19,7 +19,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
         android:text="14:00"
-        android:textColor="@color/black"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="16sp" />
 
     <TextView
@@ -29,7 +29,7 @@
         android:layout_weight="1"
         android:layout_marginStart="16dp"
         android:text="田中さんと打ち合わせ"
-        android:textColor="@color/black"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="16sp" />
 
 </LinearLayout>

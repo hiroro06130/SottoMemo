@@ -4,6 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/android:colorBackground"
     tools:context=".MainActivity">
 
     <com.google.android.material.appbar.AppBarLayout
@@ -11,7 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
-        android:background="@color/color_base_off_white"
+        android:background="?attr/colorSurface"
         app:elevation="1dp">
 
         <androidx.appcompat.widget.Toolbar
@@ -33,7 +34,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:background="?android:attr/windowBackground"
+        android:background="?attr/colorSurface"
+        app:itemIconTint="@color/bottom_nav_color"
+        app:itemTextColor="@color/bottom_nav_color"
         app:menu="@menu/bottom_nav_menu" />
 
 </RelativeLayout>
