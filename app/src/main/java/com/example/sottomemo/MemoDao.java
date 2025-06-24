@@ -6,6 +6,7 @@ import androidx.room.Delete;
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
+import androidx.room.Transaction;
 import androidx.room.Update;
 
 import java.util.List;
@@ -14,7 +15,7 @@ import java.util.List;
 public interface MemoDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    void insert(Memo memo);
+    long insert(Memo memo); // 戻り値をlongに変更
 
     @Update
     void update(Memo memo);
@@ -25,13 +26,17 @@ public interface MemoDao {
     @Delete
     void deleteMemos(List<Memo> memos);
 
+    // 中間テーブルにデータを追加するための命令
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void insertMemoCategoryCrossRef(MemoCategoryCrossRef crossRef);
+
+    // @Transactionアノテーションは、2つのクエリをまとめて実行してくれる
+    // これにより、メモと、それに関連するカテゴリを一度に取得できる
+    @Transaction
     @Query("SELECT * FROM memo_table ORDER BY last_modified DESC")
-    LiveData<List<Memo>> getAllMemos();
+    LiveData<List<MemoWithCategories>> getAllMemosWithCategories();
 
-    // キーワード(searchQuery)を含むメモを、更新日順で検索する命令
+    @Transaction
     @Query("SELECT * FROM memo_table WHERE title LIKE :searchQuery OR excerpt LIKE :searchQuery ORDER BY last_modified DESC")
-    LiveData<List<Memo>> searchMemos(String searchQuery);
-
-    @Query("DELETE FROM memo_table")
-    void deleteAll();
+    LiveData<List<MemoWithCategories>> searchMemosWithCategories(String searchQuery);
 }

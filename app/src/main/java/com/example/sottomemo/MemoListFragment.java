@@ -83,7 +83,6 @@ public class MemoListFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        // このフラグメントがメニューを持つことをシステムに知らせる
         setHasOptionsMenu(true);
         return inflater.inflate(R.layout.fragment_memo_list, container, false);
     }
@@ -99,8 +98,8 @@ public class MemoListFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
         mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
-        mMemoViewModel.getFilteredMemos().observe(getViewLifecycleOwner(), memos -> {
-            memoAdapter.submitList(memos);
+        mMemoViewModel.getFilteredMemos().observe(getViewLifecycleOwner(), memoWithCategories -> {
+            memoAdapter.submitList(memoWithCategories);
         });
 
         memoEditLauncher = registerForActivityResult(
@@ -114,12 +113,13 @@ public class MemoListFragment extends Fragment {
                             String title = memoText.split("\n")[0];
                             long currentTime = System.currentTimeMillis();
                             if (id == -1) {
-                                Memo newMemo = new Memo(title, memoText, currentTime);
-                                mMemoViewModel.insert(newMemo);
+                                // TODO: カテゴリ保存のロジックをここに追加
+                                mMemoViewModel.insert(new Memo(title, memoText, currentTime), null);
                             } else {
+                                // TODO: カテゴリ保存のロジックをここに追加
                                 Memo updatedMemo = new Memo(title, memoText, currentTime);
                                 updatedMemo.setId(id);
-                                mMemoViewModel.update(updatedMemo);
+                                mMemoViewModel.update(updatedMemo, null);
                             }
                         }
                     }
@@ -130,27 +130,21 @@ public class MemoListFragment extends Fragment {
             memoEditLauncher.launch(intent);
         });
 
-        // メニューのセットアップは、より新しい addMenuProvider を使った方法に変更します
         setupMenuProvider();
         setupClickListeners();
         setupSwipeToDelete();
     }
 
-    // フラグメントでのメニューの扱いの、よりモダンな方法
     private void setupMenuProvider() {
         requireActivity().addMenuProvider(new MenuProvider() {
             @Override
             public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
                 menuInflater.inflate(R.menu.memo_list_menu, menu);
-
                 MenuItem searchItem = menu.findItem(R.id.action_search);
                 SearchView searchView = (SearchView) searchItem.getActionView();
-
                 searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
                     @Override
-                    public boolean onQueryTextSubmit(String query) {
-                        return false;
-                    }
+                    public boolean onQueryTextSubmit(String query) { return false; }
                     @Override
                     public boolean onQueryTextChange(String newText) {
                         mMemoViewModel.setSearchQuery(newText);
@@ -161,9 +155,7 @@ public class MemoListFragment extends Fragment {
 
             @Override
             public boolean onMenuItemSelected(@NonNull MenuItem menuItem) {
-                // ★★★ ここが今回の修正点です ★★★
                 if (menuItem.getItemId() == R.id.action_settings) {
-                    // 設定アイコンが押されたら、SettingsActivityを開く
                     Intent intent = new Intent(requireActivity(), SettingsActivity.class);
                     startActivity(intent);
                     return true;
@@ -174,23 +166,24 @@ public class MemoListFragment extends Fragment {
     }
 
     private void setupClickListeners() {
-        memoAdapter.setOnItemClickListener(memo -> {
+        memoAdapter.setOnItemClickListener(item -> {
             if (mActionMode != null) {
-                memoAdapter.toggleSelection(memo);
+                memoAdapter.toggleSelection(item);
                 mActionMode.invalidate();
             } else {
-                Intent intent = new Intent(requireActivity(), SettingsActivity.class);
-                intent.putExtra(MemoEditActivity.EXTRA_ID, memo.getId());
-                intent.putExtra(MemoEditActivity.EXTRA_TITLE, memo.getTitle());
-                intent.putExtra(MemoEditActivity.EXTRA_EXCERPT, memo.getExcerpt());
+                Intent intent = new Intent(requireActivity(), MemoEditActivity.class);
+                intent.putExtra(MemoEditActivity.EXTRA_ID, item.memo.getId());
+                intent.putExtra(MemoEditActivity.EXTRA_TITLE, item.memo.getTitle());
+                intent.putExtra(MemoEditActivity.EXTRA_EXCERPT, item.memo.getExcerpt());
+                // TODO: 既存のカテゴリ情報も渡す
                 memoEditLauncher.launch(intent);
             }
         });
 
-        memoAdapter.setOnItemLongClickListener(memo -> {
+        memoAdapter.setOnItemLongClickListener(item -> {
             if (mActionMode == null) {
                 mActionMode = ((AppCompatActivity) requireActivity()).startSupportActionMode(mActionModeCallback);
-                memoAdapter.toggleSelection(memo);
+                memoAdapter.toggleSelection(item);
                 if (mActionMode != null) {
                     mActionMode.invalidate();
                 }
@@ -202,9 +195,7 @@ public class MemoListFragment extends Fragment {
         new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0,
                 ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
             @Override
-            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
-                return false;
-            }
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) { return false; }
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
                 final int position = viewHolder.getAdapterPosition();
@@ -213,7 +204,7 @@ public class MemoListFragment extends Fragment {
                         .setTitle("削除の確認")
                         .setMessage("このメモを削除しますか？")
                         .setPositiveButton("はい", (dialog, which) -> {
-                            Memo memoToDelete = memoAdapter.getCurrentList().get(position);
+                            Memo memoToDelete = memoAdapter.getCurrentList().get(position).memo;
                             mMemoViewModel.delete(memoToDelete);
                             Toast.makeText(requireContext(), "メモを削除しました", Toast.LENGTH_SHORT).show();
                         })

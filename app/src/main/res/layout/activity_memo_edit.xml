@@ -60,4 +60,26 @@
         android:textSize="16sp"
         android:importantForAutofill="no" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="カテゴリ"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:textColor="?attr/colorOnSurfaceVariant"/>
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chip_group_categories"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"/>
+
+    </HorizontalScrollView>
+
 </LinearLayout>

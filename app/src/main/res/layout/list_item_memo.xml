@@ -61,6 +61,13 @@
             android:textSize="12sp"
             tools:text="2025/06/24" />
 
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chip_group_item_categories"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            app:chipSpacingVertical="4dp"/>
+
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>
