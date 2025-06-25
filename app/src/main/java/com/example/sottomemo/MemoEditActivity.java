@@ -11,7 +11,9 @@ import androidx.lifecycle.ViewModelProvider;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class MemoEditActivity extends AppCompatActivity {
 
@@ -25,49 +27,63 @@ public class MemoEditActivity extends AppCompatActivity {
     private ChipGroup chipGroupCategories;
     private MemoViewModel mMemoViewModel;
     private int currentMemoId = -1;
-    private List<Long> selectedCategoryIds = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_memo_edit);
 
-        // UI部品の初期化
         editTextMemo = findViewById(R.id.edit_text_memo);
         buttonSave = findViewById(R.id.button_save);
         buttonBack = findViewById(R.id.button_back);
         chipGroupCategories = findViewById(R.id.chip_group_categories);
 
-        // ViewModelの初期化
         mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
 
-        // 利用可能なすべてのカテゴリを監視し、チップとして表示
-        mMemoViewModel.getAllCategories().observe(this, categories -> {
+        Intent intent = getIntent();
+        if (intent.hasExtra(EXTRA_ID)) {
+            currentMemoId = intent.getIntExtra(EXTRA_ID, -1);
+        }
+
+        mMemoViewModel.getAllCategories().observe(this, allCategories -> {
             chipGroupCategories.removeAllViews();
-            for (Category category : categories) {
+            if (allCategories == null) return;
+
+            for (Category category : allCategories) {
                 Chip chip = new Chip(this);
                 chip.setText(category.name);
                 chip.setCheckable(true);
-                chip.setTag(category.categoryId); // チップにカテゴリIDを紐付ける
-
-                // TODO: 編集中のメモが持つカテゴリを選択状態にする
-
+                chip.setTag(category.categoryId);
                 chipGroupCategories.addView(chip);
+            }
+
+            if (currentMemoId != -1) {
+                mMemoViewModel.getMemoWithCategories(currentMemoId).observe(this, memoWithCategories -> {
+                    if (memoWithCategories != null && memoWithCategories.categories != null) {
+                        Set<Long> categoryIdsForMemo = new HashSet<>();
+                        for (Category cat : memoWithCategories.categories) {
+                            categoryIdsForMemo.add(cat.categoryId);
+                        }
+                        for (int i = 0; i < chipGroupCategories.getChildCount(); i++) {
+                            Chip chip = (Chip) chipGroupCategories.getChildAt(i);
+                            long chipId = (long) chip.getTag();
+                            if (categoryIdsForMemo.contains(chipId)) {
+                                chip.setChecked(true);
+                            }
+                        }
+                    }
+                });
             }
         });
 
-        // Intentからデータを受け取る
-        Intent intent = getIntent();
-        if (intent.hasExtra(EXTRA_ID)) {
+        if (currentMemoId != -1) {
             setTitle("メモの編集");
-            currentMemoId = intent.getIntExtra(EXTRA_ID, -1);
             String excerpt = intent.getStringExtra(EXTRA_EXCERPT);
             editTextMemo.setText(excerpt);
         } else {
             setTitle("新しいメモ");
         }
 
-        // ボタンのリスナーを設定
         buttonSave.setOnClickListener(v -> saveMemo());
         buttonBack.setOnClickListener(v -> finish());
     }
@@ -79,9 +95,7 @@ public class MemoEditActivity extends AppCompatActivity {
             return;
         }
 
-        // --- カテゴリの保存ロジック（次のステップで実装） ---
-        // 選択されているチップのIDを取得
-        selectedCategoryIds.clear();
+        List<Long> selectedCategoryIds = new ArrayList<>();
         for (int i = 0; i < chipGroupCategories.getChildCount(); i++) {
             Chip chip = (Chip) chipGroupCategories.getChildAt(i);
             if (chip.isChecked()) {
@@ -89,23 +103,19 @@ public class MemoEditActivity extends AppCompatActivity {
             }
         }
 
-        // --- メモの保存ロジック（ViewModelへの命令） ---
         String title = memoText.split("\n")[0];
         long currentTime = System.currentTimeMillis();
 
-        if (currentMemoId == -1) { // 新規作成
+        if (currentMemoId == -1) {
             Memo newMemo = new Memo(title, memoText, currentTime);
-            // TODO: ViewModelにカテゴリIDも渡す
             mMemoViewModel.insert(newMemo, selectedCategoryIds);
             Toast.makeText(this, "メモが保存されました", Toast.LENGTH_SHORT).show();
-        } else { // 更新
+        } else {
             Memo updatedMemo = new Memo(title, memoText, currentTime);
             updatedMemo.setId(currentMemoId);
-            // TODO: ViewModelにカテゴリIDも渡す
             mMemoViewModel.update(updatedMemo, selectedCategoryIds);
             Toast.makeText(this, "メモが更新されました", Toast.LENGTH_SHORT).show();
         }
-
-        finish(); // 画面を閉じる
+        finish();
     }
 }

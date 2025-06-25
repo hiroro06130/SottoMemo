@@ -1,7 +1,7 @@
 package com.example.sottomemo;
 
 import android.content.Context;
-import android.graphics.Color;
+import android.content.res.ColorStateList;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -9,6 +9,7 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.cardview.widget.CardView;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
@@ -21,7 +22,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 
-// 扱うデータ型を <Memo> から <MemoWithCategories> に変更
 public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.MemoViewHolder> {
 
     private OnItemClickListener clickListener;
@@ -33,7 +33,6 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
         super(DIFF_CALLBACK);
     }
 
-    // --- 選択モード用のメソッド群（扱う型を MemoWithCategories に変更） ---
     public void startSelectionMode() { isSelectionMode = true; }
     public void finishSelectionMode() {
         isSelectionMode = false;
@@ -68,20 +67,20 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
     @Override
     public void onBindViewHolder(@NonNull MemoViewHolder holder, int position) {
         MemoWithCategories currentItem = getItem(position);
-        holder.bind(currentItem); // bindメソッドに処理を移譲
+        holder.bind(currentItem);
     }
 
     public class MemoViewHolder extends RecyclerView.ViewHolder {
         public TextView textViewTitle, textViewExcerpt, textViewDate;
         public CardView cardView;
-        public ChipGroup chipGroup; // カテゴリ表示用のChipGroupを追加
+        public ChipGroup chipGroup;
 
         public MemoViewHolder(@NonNull View itemView) {
             super(itemView);
             textViewTitle = itemView.findViewById(R.id.text_view_title);
             textViewExcerpt = itemView.findViewById(R.id.text_view_excerpt);
             textViewDate = itemView.findViewById(R.id.text_view_date);
-            chipGroup = itemView.findViewById(R.id.chip_group_item_categories); // レイアウトにChipGroupを追加する必要あり
+            chipGroup = itemView.findViewById(R.id.chip_group_item_categories);
             cardView = (CardView) itemView;
 
             itemView.setOnClickListener(v -> {
@@ -102,29 +101,42 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
 
         void bind(MemoWithCategories item) {
             Memo memo = item.memo;
+            Context context = itemView.getContext();
+
             textViewTitle.setText(memo.getTitle());
             textViewExcerpt.setText(memo.getExcerpt());
 
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault());
             textViewDate.setText(sdf.format(new Date(memo.getLastModified())));
 
-            // 選択モードの背景色処理
             if (selectedItems.contains(item)) {
-                cardView.setCardBackgroundColor(itemView.getContext().getResources().getColor(R.color.color_selection_light_gray, null));
+                cardView.setCardBackgroundColor(ContextCompat.getColor(context, R.color.color_selection_light_gray));
             } else {
                 TypedValue typedValue = new TypedValue();
-                itemView.getContext().getTheme().resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true);
+                context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true);
                 cardView.setCardBackgroundColor(typedValue.data);
             }
 
-            // カテゴリチップの表示
+            // --- カテゴリチップの表示ロジックを修正 ---
             chipGroup.removeAllViews();
             if (item.categories != null && !item.categories.isEmpty()) {
                 chipGroup.setVisibility(View.VISIBLE);
                 for (Category category : item.categories) {
-                    Chip chip = new Chip(itemView.getContext());
+                    Chip chip = new Chip(context);
                     chip.setText(category.name);
-                    chip.setChipBackgroundColorResource(android.R.color.transparent); // 色は後で調整
+
+                    // チップの背景を透明にし、枠線で色を表現する
+                    chip.setChipBackgroundColorResource(android.R.color.transparent);
+                    chip.setChipStrokeWidth(3f);
+
+                    // テーマに合わせて枠線と文字色を設定
+                    TypedValue typedValue = new TypedValue();
+                    context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorPrimary, typedValue, true);
+                    chip.setChipStrokeColor(ColorStateList.valueOf(typedValue.data));
+
+                    context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnSurfaceVariant, typedValue, true);
+                    chip.setTextColor(typedValue.data);
+
                     chipGroup.addView(chip);
                 }
             } else {
@@ -140,18 +152,15 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
         }
         @Override
         public boolean areContentsTheSame(@NonNull MemoWithCategories oldItem, @NonNull MemoWithCategories newItem) {
-            return oldItem.memo.getExcerpt().equals(newItem.memo.getExcerpt()) &&
-                    oldItem.memo.getLastModified() == newItem.memo.getLastModified() &&
-                    oldItem.categories.equals(newItem.categories);
+            if (!oldItem.memo.getExcerpt().equals(newItem.memo.getExcerpt())) return false;
+            if (oldItem.memo.getLastModified() != newItem.memo.getLastModified()) return false;
+            // カテゴリリストの比較
+            return new HashSet<>(oldItem.categories).equals(new HashSet<>(newItem.categories));
         }
     };
 
-    public interface OnItemClickListener {
-        void onItemClick(MemoWithCategories item);
-    }
-    public interface OnItemLongClickListener {
-        void onItemLongClick(MemoWithCategories item);
-    }
+    public interface OnItemClickListener { void onItemClick(MemoWithCategories item); }
+    public interface OnItemLongClickListener { void onItemLongClick(MemoWithCategories item); }
     public void setOnItemClickListener(OnItemClickListener listener) { this.clickListener = listener; }
     public void setOnItemLongClickListener(OnItemLongClickListener listener) { this.longClickListener = listener; }
 }

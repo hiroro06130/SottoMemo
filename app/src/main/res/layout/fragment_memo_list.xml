@@ -25,7 +25,7 @@
         android:contentDescription="新しいメモを作成"
         android:src="@drawable/ic_add"
         app:backgroundTint="@color/color_accent_baby_pink"
-        app:elevation="6dp"
+        app:elevation="7dp"
         app:pressedTranslationZ="12dp"
         app:tint="@color/white" />
 

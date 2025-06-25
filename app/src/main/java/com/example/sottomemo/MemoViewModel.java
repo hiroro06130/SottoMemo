@@ -20,12 +20,10 @@ public class MemoViewModel extends AndroidViewModel {
     private final LiveData<List<Todo>> mAllTodos;
     private final LiveData<List<Category>> mAllCategories;
 
-
     public MemoViewModel (Application application) {
         super(application);
         mRepository = new MemoRepository(application);
 
-        // mRepositoryの準備ができた後で、それを使う変数を準備する
         mFilteredMemos = Transformations.switchMap(searchQuery, query -> {
             if (query == null || query.isEmpty()) {
                 return mRepository.getAllMemosWithCategories();
@@ -47,16 +45,43 @@ public class MemoViewModel extends AndroidViewModel {
         searchQuery.setValue(query);
     }
 
-    public void insert(Memo memo, List<Long> categoryIds) { mRepository.insert(memo, categoryIds); }
-    public void update(Memo memo, List<Long> categoryIds) { mRepository.update(memo, categoryIds); }
-    public void delete(Memo memo) { mRepository.delete(memo); }
-    public void deleteMemos(List<Memo> memos) { mRepository.deleteMemos(memos); }
+    public LiveData<MemoWithCategories> getMemoWithCategories(long memoId) {
+        return mRepository.getMemoWithCategories(memoId);
+    }
+
+    public void insert(Memo memo, List<Long> categoryIds) {
+        mRepository.insert(memo, categoryIds);
+    }
+
+    public void update(Memo memo, List<Long> categoryIds) {
+        mRepository.update(memo, categoryIds);
+    }
+
+    public void delete(Memo memo) {
+        mRepository.delete(memo);
+    }
+
+    public void deleteMemos(List<Memo> memos) {
+        mRepository.deleteMemos(memos);
+    }
+
 
     // --- ToDo関連のメソッド ---
-    LiveData<List<Todo>> getAllTodos() { return mAllTodos; }
-    public void update(Todo todo) { mRepository.update(todo); }
+    LiveData<List<Todo>> getAllTodos() {
+        return mAllTodos;
+    }
+
+    public void update(Todo todo) {
+        mRepository.update(todo);
+    }
+
 
     // --- カテゴリ関連のメソッド ---
-    LiveData<List<Category>> getAllCategories() { return mAllCategories; }
-    public void insert(Category category) { mRepository.insert(category); }
+    LiveData<List<Category>> getAllCategories() {
+        return mAllCategories;
+    }
+
+    public void insert(Category category) {
+        mRepository.insert(category);
+    }
 }

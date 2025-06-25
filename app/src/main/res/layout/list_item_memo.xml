@@ -49,7 +49,13 @@
             android:maxLines="2"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="14sp"
-            tools:text="これはメモ本文の抜粋です。2行まで表示されます。来週水曜 14時に渋谷で田中さんと打ち合わせ..." />
+            tools:text="これはメモ本文の抜粋です..." />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chip_group_item_categories"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
 
         <TextView
             android:id="@+id/text_view_date"
@@ -59,15 +65,7 @@
             android:gravity="end"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
-            tools:text="2025/06/24" />
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/chip_group_item_categories"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            app:chipSpacingVertical="4dp"/>
-
+            tools:text="2025/06/25" />
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

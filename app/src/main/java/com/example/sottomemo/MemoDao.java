@@ -15,7 +15,7 @@ import java.util.List;
 public interface MemoDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    long insert(Memo memo); // 戻り値をlongに変更
+    long insert(Memo memo);
 
     @Update
     void update(Memo memo);
@@ -26,12 +26,12 @@ public interface MemoDao {
     @Delete
     void deleteMemos(List<Memo> memos);
 
-    // 中間テーブルにデータを追加するための命令
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertMemoCategoryCrossRef(MemoCategoryCrossRef crossRef);
 
-    // @Transactionアノテーションは、2つのクエリをまとめて実行してくれる
-    // これにより、メモと、それに関連するカテゴリを一度に取得できる
+    @Query("DELETE FROM memo_category_cross_ref WHERE memoId = :memoId")
+    void deleteCrossRefsForMemo(long memoId);
+
     @Transaction
     @Query("SELECT * FROM memo_table ORDER BY last_modified DESC")
     LiveData<List<MemoWithCategories>> getAllMemosWithCategories();
@@ -39,4 +39,9 @@ public interface MemoDao {
     @Transaction
     @Query("SELECT * FROM memo_table WHERE title LIKE :searchQuery OR excerpt LIKE :searchQuery ORDER BY last_modified DESC")
     LiveData<List<MemoWithCategories>> searchMemosWithCategories(String searchQuery);
+
+    // 特定のメモを、そのカテゴリ情報と共に取得する
+    @Transaction
+    @Query("SELECT * FROM memo_table WHERE id = :memoId")
+    LiveData<MemoWithCategories> getMemoWithCategories(long memoId);
 }

@@ -27,9 +27,13 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.snackbar.Snackbar;
 
+import java.io.Serializable;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class MemoListFragment extends Fragment {
@@ -83,7 +87,7 @@ public class MemoListFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        setHasOptionsMenu(true);
+        // onCreateViewでは、レイアウトを生成するだけ
         return inflater.inflate(R.layout.fragment_memo_list, container, false);
     }
 
@@ -91,17 +95,20 @@ public class MemoListFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        // UI部品のセットアップ
         recyclerView = view.findViewById(R.id.recycler_view_memos);
         fabNewMemo = view.findViewById(R.id.fab_new_memo);
         memoAdapter = new MemoAdapter();
         recyclerView.setAdapter(memoAdapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
+        // ViewModelのセットアップ
         mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
         mMemoViewModel.getFilteredMemos().observe(getViewLifecycleOwner(), memoWithCategories -> {
             memoAdapter.submitList(memoWithCategories);
         });
 
+        // 結果受け取りランチャーのセットアップ
         memoEditLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -109,27 +116,33 @@ public class MemoListFragment extends Fragment {
                         Intent data = result.getData();
                         int id = data.getIntExtra(MemoEditActivity.EXTRA_ID, -1);
                         String memoText = data.getStringExtra(MemoEditActivity.EXTRA_EXCERPT);
+
+                        // SerializableとしてArrayList<Long>を受け取る
+                        Serializable serializableExtra = data.getSerializableExtra("SELECTED_CATEGORY_IDS");
+                        List<Long> selectedCategoryIds = (serializableExtra instanceof List) ? (List<Long>) serializableExtra : new ArrayList<>();
+
                         if (memoText != null && !memoText.isEmpty()) {
                             String title = memoText.split("\n")[0];
                             long currentTime = System.currentTimeMillis();
                             if (id == -1) {
-                                // TODO: カテゴリ保存のロジックをここに追加
-                                mMemoViewModel.insert(new Memo(title, memoText, currentTime), null);
+                                Memo newMemo = new Memo(title, memoText, currentTime);
+                                mMemoViewModel.insert(newMemo, selectedCategoryIds);
+                                Toast.makeText(requireContext(), "メモが保存されました", Toast.LENGTH_SHORT).show();
                             } else {
-                                // TODO: カテゴリ保存のロジックをここに追加
                                 Memo updatedMemo = new Memo(title, memoText, currentTime);
                                 updatedMemo.setId(id);
-                                mMemoViewModel.update(updatedMemo, null);
+                                mMemoViewModel.update(updatedMemo, selectedCategoryIds);
+                                Toast.makeText(requireContext(), "メモが更新されました", Toast.LENGTH_SHORT).show();
                             }
                         }
                     }
                 });
 
+        // ボタンやリストのリスナーをセットアップ
         fabNewMemo.setOnClickListener(v -> {
             Intent intent = new Intent(requireActivity(), MemoEditActivity.class);
             memoEditLauncher.launch(intent);
         });
-
         setupMenuProvider();
         setupClickListeners();
         setupSwipeToDelete();
@@ -140,8 +153,10 @@ public class MemoListFragment extends Fragment {
             @Override
             public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
                 menuInflater.inflate(R.menu.memo_list_menu, menu);
+
                 MenuItem searchItem = menu.findItem(R.id.action_search);
                 SearchView searchView = (SearchView) searchItem.getActionView();
+
                 searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
                     @Override
                     public boolean onQueryTextSubmit(String query) { return false; }
@@ -169,13 +184,18 @@ public class MemoListFragment extends Fragment {
         memoAdapter.setOnItemClickListener(item -> {
             if (mActionMode != null) {
                 memoAdapter.toggleSelection(item);
-                mActionMode.invalidate();
+                if(mActionMode != null) mActionMode.invalidate();
             } else {
                 Intent intent = new Intent(requireActivity(), MemoEditActivity.class);
                 intent.putExtra(MemoEditActivity.EXTRA_ID, item.memo.getId());
-                intent.putExtra(MemoEditActivity.EXTRA_TITLE, item.memo.getTitle());
                 intent.putExtra(MemoEditActivity.EXTRA_EXCERPT, item.memo.getExcerpt());
-                // TODO: 既存のカテゴリ情報も渡す
+
+                ArrayList<Long> categoryIds = new ArrayList<>();
+                for(Category cat : item.categories) {
+                    categoryIds.add(cat.categoryId);
+                }
+                intent.putExtra("EXISTING_CATEGORY_IDS", categoryIds);
+
                 memoEditLauncher.launch(intent);
             }
         });
@@ -184,9 +204,7 @@ public class MemoListFragment extends Fragment {
             if (mActionMode == null) {
                 mActionMode = ((AppCompatActivity) requireActivity()).startSupportActionMode(mActionModeCallback);
                 memoAdapter.toggleSelection(item);
-                if (mActionMode != null) {
-                    mActionMode.invalidate();
-                }
+                if (mActionMode != null) mActionMode.invalidate();
             }
         });
     }
@@ -198,17 +216,19 @@ public class MemoListFragment extends Fragment {
             public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) { return false; }
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
-                final int position = viewHolder.getAdapterPosition();
-                memoAdapter.notifyItemChanged(position);
-                new AlertDialog.Builder(requireContext())
-                        .setTitle("削除の確認")
-                        .setMessage("このメモを削除しますか？")
-                        .setPositiveButton("はい", (dialog, which) -> {
-                            Memo memoToDelete = memoAdapter.getCurrentList().get(position).memo;
-                            mMemoViewModel.delete(memoToDelete);
-                            Toast.makeText(requireContext(), "メモを削除しました", Toast.LENGTH_SHORT).show();
-                        })
-                        .setNegativeButton("いいえ", null)
+                int position = viewHolder.getAdapterPosition();
+                MemoWithCategories itemToDelete = memoAdapter.getCurrentList().get(position);
+                Memo memoToDelete = itemToDelete.memo;
+
+                ArrayList<Long> categoryIds = new ArrayList<>();
+                for(Category cat : itemToDelete.categories) {
+                    categoryIds.add(cat.categoryId);
+                }
+
+                mMemoViewModel.delete(memoToDelete);
+
+                Snackbar.make(requireActivity().findViewById(R.id.memo_list_coordinator_layout), "メモを削除しました", Snackbar.LENGTH_LONG)
+                        .setAction("元に戻す", v -> mMemoViewModel.insert(memoToDelete, categoryIds))
                         .show();
             }
         }).attachToRecyclerView(recyclerView);

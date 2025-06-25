@@ -27,9 +27,15 @@ public class MemoRepository {
     LiveData<List<MemoWithCategories>> getAllMemosWithCategories() {
         return mAllMemos;
     }
+
     LiveData<List<MemoWithCategories>> searchMemosWithCategories(String searchQuery) {
         return mMemoDao.searchMemosWithCategories(searchQuery);
     }
+
+    LiveData<MemoWithCategories> getMemoWithCategories(long memoId) {
+        return mMemoDao.getMemoWithCategories(memoId);
+    }
+
     void insert(Memo memo, List<Long> categoryIds) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
             long memoId = mMemoDao.insert(memo);
@@ -43,11 +49,11 @@ public class MemoRepository {
             }
         });
     }
+
     void update(Memo memo, List<Long> categoryIds) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
             mMemoDao.update(memo);
-            // TODO: いったん関連を全て削除して、もう一度登録し直す（より良い方法は後で検討）
-            // mMemoDao.deleteCrossRefsForMemo(memo.getId());
+            mMemoDao.deleteCrossRefsForMemo(memo.getId());
             if (categoryIds != null) {
                 for (Long categoryId : categoryIds) {
                     MemoCategoryCrossRef crossRef = new MemoCategoryCrossRef();
@@ -58,21 +64,26 @@ public class MemoRepository {
             }
         });
     }
+
     void delete(Memo memo) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> mMemoDao.delete(memo));
     }
+
     void deleteMemos(List<Memo> memos) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> mMemoDao.deleteMemos(memos));
     }
 
+
     // --- ToDo関連 ---
     LiveData<List<Todo>> getAllTodos() { return mAllTodos; }
+
     void update(Todo todo) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> mTodoDao.update(todo));
     }
 
     // --- カテゴリ関連 ---
     LiveData<List<Category>> getAllCategories() { return mCategoryDao.getAllCategories(); }
+
     void insert(Category category) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> mCategoryDao.insert(category));
     }
