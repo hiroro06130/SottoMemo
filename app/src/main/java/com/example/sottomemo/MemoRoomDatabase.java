@@ -12,12 +12,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Database(entities = {Memo.class, Todo.class, Category.class, MemoCategoryCrossRef.class}, version = 3, exportSchema = false)
+@Database(entities = {Memo.class, Todo.class, Category.class, MemoCategoryCrossRef.class, Event.class}, version = 4, exportSchema = false)
 public abstract class MemoRoomDatabase extends RoomDatabase {
 
     public abstract MemoDao memoDao();
     public abstract TodoDao todoDao();
     public abstract CategoryDao categoryDao();
+    public abstract EventDao eventDao();
 
     private static volatile MemoRoomDatabase INSTANCE;
     private static final int NUMBER_OF_THREADS = 4;
@@ -29,10 +30,7 @@ public abstract class MemoRoomDatabase extends RoomDatabase {
         public void onCreate(@NonNull SupportSQLiteDatabase db) {
             super.onCreate(db);
             databaseWriteExecutor.execute(() -> {
-                TodoDao todoDao = INSTANCE.todoDao();
-                todoDao.insert(new Todo("牛乳を買う", false));
-                todoDao.insert(new Todo("レポートを提出する", true));
-
+                // 初回起動時にダミーのカテゴリだけを作成する
                 CategoryDao categoryDao = INSTANCE.categoryDao();
                 categoryDao.insert(new Category("仕事", Color.parseColor("#A8D8C9")));
                 categoryDao.insert(new Category("プライベート", Color.parseColor("#F7CACA")));

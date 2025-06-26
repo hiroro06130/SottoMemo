@@ -13,38 +13,18 @@ public class Todo {
     private String title;
     private boolean isCompleted;
 
-    // Roomが内部で使うための空のコンストラクタ
-    @Ignore
     public Todo() {}
 
-    // 私たちがプログラムで使うためのコンストラクタ
+    @Ignore
     public Todo(String title, boolean isCompleted) {
         this.title = title;
         this.isCompleted = isCompleted;
     }
 
-    // Roomが必要とするゲッターとセッター
-    public long getId() {
-        return id;
-    }
-
-    public void setId(long id) {
-        this.id = id;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public boolean isCompleted() {
-        return isCompleted;
-    }
-
-    public void setCompleted(boolean completed) {
-        this.isCompleted = completed;
-    }
+    public long getId() { return id; }
+    public void setId(long id) { this.id = id; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public boolean isCompleted() { return isCompleted; }
+    public void setCompleted(boolean completed) { this.isCompleted = completed; }
 }

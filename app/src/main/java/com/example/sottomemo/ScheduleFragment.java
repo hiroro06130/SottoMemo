@@ -7,7 +7,6 @@ import android.view.ViewGroup;
 import android.widget.CalendarView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,9 +17,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.tabs.TabLayout;
 
-import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.List;
+import java.util.TimeZone;
 
 public class ScheduleFragment extends Fragment {
 
@@ -45,6 +43,15 @@ public class ScheduleFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        initializeViews(view);
+        mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
+
+        setupTabs();
+        setupCalendarPage();
+        setupTodoList();
+    }
+
+    private void initializeViews(View view) {
         tabLayout = view.findViewById(R.id.tab_layout_schedule);
         calendarPageLayout = view.findViewById(R.id.calendar_page_layout);
         todoPageLayout = view.findViewById(R.id.todo_page_layout);
@@ -52,12 +59,6 @@ public class ScheduleFragment extends Fragment {
         textViewSelectedDateHeader = view.findViewById(R.id.text_view_selected_date_header);
         recyclerViewDailyEvents = view.findViewById(R.id.recycler_view_daily_events);
         recyclerViewTodos = view.findViewById(R.id.recycler_view_todos);
-
-        mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
-
-        setupTabs();
-        setupCalendarPage();
-        setupTodoList();
     }
 
     private void setupTabs() {
@@ -87,12 +88,15 @@ public class ScheduleFragment extends Fragment {
         eventAdapter = new EventAdapter();
         recyclerViewDailyEvents.setLayoutManager(new LinearLayoutManager(requireContext()));
         recyclerViewDailyEvents.setAdapter(eventAdapter);
-        calendarView.setOnDateChangeListener((view1, year, month, dayOfMonth) -> {
-            String selectedDate = year + "年" + (month + 1) + "月" + dayOfMonth + "日";
-            textViewSelectedDateHeader.setText(selectedDate + "の予定");
-            showDummyEvents(dayOfMonth);
+
+        calendarView.setOnDateChangeListener((view, year, month, dayOfMonth) -> {
+            // 日付が選択されたら、その日のイベントを取得するようViewModelに依頼
+            loadEventsForDate(year, month, dayOfMonth);
         });
-        setInitialDate();
+
+        // 初回表示時に、今日のイベントを読み込む
+        Calendar today = Calendar.getInstance();
+        loadEventsForDate(today.get(Calendar.YEAR), today.get(Calendar.MONTH), today.get(Calendar.DAY_OF_MONTH));
     }
 
     private void setupTodoList() {
@@ -105,34 +109,29 @@ public class ScheduleFragment extends Fragment {
         });
 
         todoAdapter.setOnTodoCheckedChangeListener((todo, isChecked) -> {
-            // 元のtodoオブジェクトは変更せず、新しいオブジェクトを作成する
             Todo updatedTodo = new Todo(todo.getTitle(), isChecked);
-            // 更新するにはIDが必要なので、古いIDをセットする
             updatedTodo.setId(todo.getId());
-
-            // この「新しい」オブジェクトをViewModelに渡してデータベースを更新する
             mMemoViewModel.update(updatedTodo);
         });
     }
 
-    private void setInitialDate() {
-        Calendar cal = Calendar.getInstance();
-        int year = cal.get(Calendar.YEAR);
-        int month = cal.get(Calendar.MONTH);
-        int dayOfMonth = cal.get(Calendar.DAY_OF_MONTH);
-        String initialDate = year + "年" + (month + 1) + "月" + dayOfMonth + "日";
-        textViewSelectedDateHeader.setText(initialDate + "の予定");
-        showDummyEvents(dayOfMonth);
-    }
+    private void loadEventsForDate(int year, int month, int dayOfMonth) {
+        // ヘッダーのテキストを更新
+        String headerText = year + "年" + (month + 1) + "月" + dayOfMonth + "日";
+        textViewSelectedDateHeader.setText(headerText + "の予定");
 
-    private void showDummyEvents(int day) {
-        List<Event> dummyEvents = new ArrayList<>();
-        if (day % 3 == 0) {
-            dummyEvents.add(new Event(1, "10:00", "チーム定例会議"));
-            dummyEvents.add(new Event(2, "15:00", "歯医者の予約"));
-        } else if (day % 3 == 1) {
-            dummyEvents.add(new Event(3, "19:00", "友人とのディナー"));
-        }
-        eventAdapter.submitList(dummyEvents);
+        // 選択された日の始まりと終わりのタイムスタンプを計算
+        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        calendar.set(year, month, dayOfMonth, 0, 0, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        long startOfDay = calendar.getTimeInMillis();
+        calendar.add(Calendar.DAY_OF_MONTH, 1);
+        long endOfDay = calendar.getTimeInMillis();
+
+        // ViewModelに、その日のイベントを問い合わせる
+        mMemoViewModel.getEventsForDay(startOfDay, endOfDay).observe(getViewLifecycleOwner(), events -> {
+            // 取得したイベントをアダプターにセット
+            eventAdapter.submitList(events);
+        });
     }
 }
