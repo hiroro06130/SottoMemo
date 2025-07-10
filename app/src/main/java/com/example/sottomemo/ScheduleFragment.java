@@ -7,16 +7,13 @@ import android.view.ViewGroup;
 import android.widget.CalendarView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
 import com.google.android.material.tabs.TabLayout;
-
 import java.util.Calendar;
 import java.util.TimeZone;
 
@@ -44,7 +41,8 @@ public class ScheduleFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         initializeViews(view);
-        mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
+        // ViewModelを、親のActivityと共有する形で取得
+        mMemoViewModel = new ViewModelProvider(requireActivity()).get(MemoViewModel.class);
 
         setupTabs();
         setupCalendarPage();
@@ -89,14 +87,19 @@ public class ScheduleFragment extends Fragment {
         recyclerViewDailyEvents.setLayoutManager(new LinearLayoutManager(requireContext()));
         recyclerViewDailyEvents.setAdapter(eventAdapter);
 
-        calendarView.setOnDateChangeListener((view, year, month, dayOfMonth) -> {
-            // 日付が選択されたら、その日のイベントを取得するようViewModelに依頼
-            loadEventsForDate(year, month, dayOfMonth);
+        // ViewModelに、選択された日付のイベントを監視させる
+        mMemoViewModel.getEventsForSelectedDate().observe(getViewLifecycleOwner(), events -> {
+            // データベースから取得したイベントのリストをアダプターに渡す
+            eventAdapter.submitList(events);
         });
 
-        // 初回表示時に、今日のイベントを読み込む
+        calendarView.setOnDateChangeListener((view, year, month, dayOfMonth) -> {
+            updateSelectedDate(year, month, dayOfMonth);
+        });
+
+        // 初回表示時に、今日の日付をセットする
         Calendar today = Calendar.getInstance();
-        loadEventsForDate(today.get(Calendar.YEAR), today.get(Calendar.MONTH), today.get(Calendar.DAY_OF_MONTH));
+        updateSelectedDate(today.get(Calendar.YEAR), today.get(Calendar.MONTH), today.get(Calendar.DAY_OF_MONTH));
     }
 
     private void setupTodoList() {
@@ -104,34 +107,26 @@ public class ScheduleFragment extends Fragment {
         recyclerViewTodos.setLayoutManager(new LinearLayoutManager(requireContext()));
         recyclerViewTodos.setAdapter(todoAdapter);
 
+        // ViewModelのToDoリストを監視し、変更があればUIに反映
         mMemoViewModel.getAllTodos().observe(getViewLifecycleOwner(), todos -> {
             todoAdapter.submitList(todos);
         });
 
         todoAdapter.setOnTodoCheckedChangeListener((todo, isChecked) -> {
+            // チェック状態の変更をDBに反映させる
             Todo updatedTodo = new Todo(todo.getTitle(), isChecked);
             updatedTodo.setId(todo.getId());
             mMemoViewModel.update(updatedTodo);
         });
     }
 
-    private void loadEventsForDate(int year, int month, int dayOfMonth) {
-        // ヘッダーのテキストを更新
+    private void updateSelectedDate(int year, int month, int dayOfMonth) {
         String headerText = year + "年" + (month + 1) + "月" + dayOfMonth + "日";
         textViewSelectedDateHeader.setText(headerText + "の予定");
 
-        // 選択された日の始まりと終わりのタイムスタンプを計算
         Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         calendar.set(year, month, dayOfMonth, 0, 0, 0);
         calendar.set(Calendar.MILLISECOND, 0);
-        long startOfDay = calendar.getTimeInMillis();
-        calendar.add(Calendar.DAY_OF_MONTH, 1);
-        long endOfDay = calendar.getTimeInMillis();
-
-        // ViewModelに、その日のイベントを問い合わせる
-        mMemoViewModel.getEventsForDay(startOfDay, endOfDay).observe(getViewLifecycleOwner(), events -> {
-            // 取得したイベントをアダプターにセット
-            eventAdapter.submitList(events);
-        });
+        mMemoViewModel.setSelectedDate(calendar.getTimeInMillis());
     }
 }

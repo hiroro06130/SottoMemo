@@ -103,7 +103,7 @@ public class MemoListFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
         // ViewModelのセットアップ
-        mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
+        mMemoViewModel = new ViewModelProvider(requireActivity()).get(MemoViewModel.class);
         mMemoViewModel.getFilteredMemos().observe(getViewLifecycleOwner(), memoWithCategories -> {
             memoAdapter.submitList(memoWithCategories);
         });

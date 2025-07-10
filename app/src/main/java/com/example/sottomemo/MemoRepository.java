@@ -2,29 +2,30 @@ package com.example.sottomemo;
 
 import android.app.Application;
 import android.util.Log;
-
 import androidx.lifecycle.LiveData;
-
 import com.example.sottomemo.api.AiParsedData;
 import com.example.sottomemo.api.ApiClient;
 import com.example.sottomemo.api.GeminiRequest;
 import com.example.sottomemo.api.GeminiResponse;
 import com.google.gson.Gson;
-
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
-
+import java.util.Locale;
+import java.util.TimeZone;
 import retrofit2.Response;
 
 public class MemoRepository {
 
-    private MemoDao mMemoDao;
-    private TodoDao mTodoDao;
-    private CategoryDao mCategoryDao;
-    private EventDao mEventDao;
-    private LiveData<List<MemoWithCategories>> mAllMemos;
-    private LiveData<List<Todo>> mAllTodos;
-    private LiveData<List<Category>> mAllCategories;
+    private final MemoDao mMemoDao;
+    private final TodoDao mTodoDao;
+    private final CategoryDao mCategoryDao;
+    private final EventDao mEventDao;
+    private final LiveData<List<MemoWithCategories>> mAllMemos;
+    private final LiveData<List<Todo>> mAllTodos;
+    private final LiveData<List<Category>> mAllCategories;
 
     MemoRepository(Application application) {
         MemoRoomDatabase db = MemoRoomDatabase.getDatabase(application);
@@ -85,25 +86,53 @@ public class MemoRepository {
     void insert(Event event) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mEventDao.insert(event)); }
 
     // --- AI関連 ---
-    AiParsedData analyzeTextWithAi(String text) {
-        String prompt = "以下の文章から、予定やToDoを抽出し、JSON形式で出力してください。もし何もなければ、空のJSON `{}` を返してください。\n\n" + text;
-        try {
-            Response<GeminiResponse> response = ApiClient.getApiService()
-                    .generateContent(BuildConfig.GEMINI_API_KEY, new GeminiRequest(prompt))
-                    .execute();
-            if (response.isSuccessful() && response.body() != null) {
-                String jsonResponse = response.body().getResponseText();
-                if (jsonResponse != null) {
+    void analyzeAndSave(Memo memo) {
+        MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
+            String prompt = "次の文章からToDoリストの項目だけを抽出し、{\"todos\":[{\"description\":\"タスク内容\"}]} というJSON形式で出力してください。ToDoがなければ空のJSON `{}` を返してください。\n\n" + memo.getExcerpt();
+
+            try {
+                Response<GeminiResponse> response = ApiClient.getApiService()
+                        .generateContent(BuildConfig.GEMINI_API_KEY, new GeminiRequest(prompt))
+                        .execute();
+                if (response.isSuccessful() && response.body() != null) {
+                    String jsonResponse = response.body().getResponseText();
+                    if (jsonResponse == null) return;
+
                     jsonResponse = jsonResponse.replace("```json", "").replace("```", "").trim();
-                    return new Gson().fromJson(jsonResponse, AiParsedData.class);
+                    AiParsedData result = new Gson().fromJson(jsonResponse, AiParsedData.class);
+
+                    if (result == null) return;
+
+                    if (result.todos != null && !result.todos.isEmpty()) {
+                        for (AiParsedData.AiTodo aiTodo : result.todos) {
+                            mTodoDao.insert(new Todo(aiTodo.description, false));
+                            Log.d("AI_SAVE", "Saved ToDo: " + aiTodo.description);
+                        }
+                    }
+                    if (result.events != null && !result.events.isEmpty()) {
+                        for (AiParsedData.AiEvent aiEvent : result.events) {
+                            try {
+                                String dateTimeString = aiEvent.date + " " + aiEvent.time;
+                                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+                                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                                Date eventDate = sdf.parse(dateTimeString);
+                                if (eventDate != null) {
+                                    Event newEvent = new Event(aiEvent.summary, aiEvent.time, eventDate.getTime());
+                                    mEventDao.insert(newEvent);
+                                    Log.d("AI_SAVE", "Saved Event: " + newEvent.title);
+                                }
+                            } catch (ParseException e) {
+                                Log.e("AI_SAVE", "Failed to parse date-time: " + aiEvent.date + " " + aiEvent.time, e);
+                            }
+                        }
+                    }
+                } else {
+                    Log.e("AI_RESPONSE", "API Error: " + response.code());
                 }
-            } else {
-                Log.e("AI_RESPONSE", "API Error: " + response.code());
+            } catch (Exception e) {
+                e.printStackTrace();
+                Log.e("AI_RESPONSE", "Error during AI analysis: " + e.getMessage());
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-            Log.e("AI_RESPONSE", "Error during AI analysis: " + e.getMessage());
-        }
-        return null;
+        });
     }
 }

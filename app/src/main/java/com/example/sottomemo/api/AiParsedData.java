@@ -3,19 +3,35 @@ package com.example.sottomemo.api;
 import com.google.gson.annotations.SerializedName;
 import java.util.List;
 
-// AIからのJSONレスポンス全体に対応するクラス
 public class AiParsedData {
 
     @SerializedName("todos")
     public List<AiTodo> todos;
-    // TODO: 将来的には List<AiEvent> events; もここに追加する
 
-    // 中のToDoリストのアイテムに対応するクラス
+    @SerializedName("events")
+    public List<AiEvent> events;
+
     public static class AiTodo {
         @SerializedName("description")
         public String description;
+    }
+
+    public static class AiEvent {
+        @SerializedName("summary")
+        public String summary;
+
+        @SerializedName("date")
+        public String date;
 
         @SerializedName("time")
-        public String time; // 日付も含む可能性があるためStringで受け取る
+        public String time;
     }
-}
+
+
+
+        @SerializedName("date")
+        public String date; // "2025-07-04" のような形式
+
+        @SerializedName("time")
+        public String time; // "19:00" のような形式
+    }

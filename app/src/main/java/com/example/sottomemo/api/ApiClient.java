@@ -1,5 +1,7 @@
 package com.example.sottomemo.api;
 
+import java.util.concurrent.TimeUnit;
+import okhttp3.OkHttpClient; // OkHttpClientをインポート
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
@@ -13,10 +15,20 @@ public class ApiClient {
 
     private static Retrofit getClient() {
         if (retrofit == null) {
+            // --- ここからが追加・修正部分 ---
+            // タイムアウト時間を設定した、新しい通信クライアントを作成
+            OkHttpClient okHttpClient = new OkHttpClient.Builder()
+                    .connectTimeout(60, TimeUnit.SECONDS)
+                    .readTimeout(60, TimeUnit.SECONDS)
+                    .writeTimeout(60, TimeUnit.SECONDS)
+                    .build();
+
             retrofit = new Retrofit.Builder()
                     .baseUrl(BASE_URL)
+                    .client(okHttpClient) // 作成したクライアントをセット
                     .addConverterFactory(GsonConverterFactory.create())
                     .build();
+            // --- 追加・修正部分ここまで ---
         }
         return retrofit;
     }
