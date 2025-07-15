@@ -11,6 +11,7 @@ import com.google.gson.Gson;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -86,9 +87,36 @@ public class MemoRepository {
     void insert(Event event) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mEventDao.insert(event)); }
 
     // --- AI関連 ---
+
+    public AiParsedData analyzeTextWithAi(String text) {
+        // このメソッドの本体は、analyzeAndSaveに任せるので、今は何もしなくて良い
+        return null; // 後で修正します
+    }
+
     void analyzeAndSave(Memo memo) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
-            String prompt = "次の文章からToDoリストの項目だけを抽出し、{\"todos\":[{\"description\":\"タスク内容\"}]} というJSON形式で出力してください。ToDoがなければ空のJSON `{}` を返してください。\n\n" + memo.getExcerpt();
+            String prompt = "あなたは、入力されたテキストから「予定」と「ToDo」を抽出する、非常に優秀なアシスタントです。" +
+                    "以下のルールと例に厳密に従って、結果をJSON形式で出力してください。\n\n" +
+                    "ルール:\n" +
+                    "1. 予定は 'events' キー、ToDoは 'todos' キーに、それぞれ配列として格納してください。\n" +
+                    "2. 予定には 'summary' (件名), 'date' (YYYY-MM-DD形式), 'time' (HH:mm形式) を含めてください。\n" +
+                    "3. ToDoには 'description' (内容) を含めてください。\n" +
+                    "4. 該当する予定やToDoが一つもない場合は、必ず `{\"events\":[], \"todos\":[]}` という空のJSONを返してください。\n" +
+                    "5. 日付や曜日だけが書かれた名詞のメモ（例：「月曜 課題」「明日 会議」）も、文脈から判断してToDoや予定として解釈してください。\n" +
+                    "6. 余計な説明や前置きは一切不要です。JSONオブジェクトだけを出力してください。\n\n" +
+                    "例1:\n" +
+                    "入力テキスト: 「来週水曜14時にクライアントと打ち合わせ。あと、牛乳を買って帰る」\n" +
+                    "出力JSON: {\\\"events\\\":[{\\\"summary\\\":\\\"クライアントと打ち合わせ\\\",\\\"date\\\":\\\"2025-07-23\\\",\\\"time\\\":\\\"14:00\\\"}],\\\"todos\\\":[{\\\"description\\\":\\\"牛乳を買って帰る\\\"}]}\n\n" +
+                    "例2:\n" +
+                    "入力テキスト: 「明日部活」\n" +
+                    "出力JSON: {\\\"todos\\\":[{\\\"description\\\":\\\"部活\\\"}]}\n\n" +
+                    "例3:\n" +
+                    "入力テキスト: 「金曜 燃えるゴミ」\n" +
+                    "出力JSON: {\\\"todos\\\":[{\\\"description\\\":\\\"燃えるゴミを出す\\\"}]}\n\n" +
+                    "では、本番です。\n" +
+                    "入力テキスト:\n" +
+                    "「" + memo.getExcerpt() + "」";
+
 
             try {
                 Response<GeminiResponse> response = ApiClient.getApiService()
@@ -106,7 +134,6 @@ public class MemoRepository {
                     if (result.todos != null && !result.todos.isEmpty()) {
                         for (AiParsedData.AiTodo aiTodo : result.todos) {
                             mTodoDao.insert(new Todo(aiTodo.description, false));
-                            Log.d("AI_SAVE", "Saved ToDo: " + aiTodo.description);
                         }
                     }
                     if (result.events != null && !result.events.isEmpty()) {
@@ -119,7 +146,6 @@ public class MemoRepository {
                                 if (eventDate != null) {
                                     Event newEvent = new Event(aiEvent.summary, aiEvent.time, eventDate.getTime());
                                     mEventDao.insert(newEvent);
-                                    Log.d("AI_SAVE", "Saved Event: " + newEvent.title);
                                 }
                             } catch (ParseException e) {
                                 Log.e("AI_SAVE", "Failed to parse date-time: " + aiEvent.date + " " + aiEvent.time, e);
@@ -127,7 +153,7 @@ public class MemoRepository {
                         }
                     }
                 } else {
-                    Log.e("AI_RESPONSE", "API Error: " + response.code());
+                    Log.e("AI_RESPONSE", "API Error: " + response.code() + " " + response.message());
                 }
             } catch (Exception e) {
                 e.printStackTrace();
