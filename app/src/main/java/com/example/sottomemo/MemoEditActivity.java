@@ -34,16 +34,22 @@ public class MemoEditActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_memo_edit);
 
+        // 1. UI部品を初期化する
         initializeViews();
+
+        // 2. ViewModelを、最初に初期化する
         mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
 
+        // 3. Intentを取得する
         Intent intent = getIntent();
         if (intent.hasExtra(EXTRA_ID)) {
             currentMemoId = intent.getLongExtra(EXTRA_ID, -1L);
         }
 
+        // 4. ViewModelの準備ができた後で、カテゴリチップのセットアップを呼ぶ
         setupCategoryChips(intent);
 
+        // 5. 編集モードかどうかの判定と、テキストのセット
         if (currentMemoId != -1) {
             setTitle("メモの編集");
             String excerpt = intent.getStringExtra(EXTRA_EXCERPT);
@@ -52,6 +58,7 @@ public class MemoEditActivity extends AppCompatActivity {
             setTitle("新しいメモ");
         }
 
+        // 6. ボタンのリスナーを設定
         buttonSave.setOnClickListener(v -> saveMemo());
         buttonBack.setOnClickListener(v -> finish());
     }
@@ -93,6 +100,8 @@ public class MemoEditActivity extends AppCompatActivity {
             return;
         }
 
+        // --- 新しいロジック ---
+        // 選択されたカテゴリのIDをリストに集める
         ArrayList<Long> selectedCategoryIds = new ArrayList<>();
         for (int i = 0; i < chipGroupCategories.getChildCount(); i++) {
             Chip chip = (Chip) chipGroupCategories.getChildAt(i);
@@ -101,19 +110,20 @@ public class MemoEditActivity extends AppCompatActivity {
             }
         }
 
-        String title = memoText.split("\n")[0];
-        long currentTime = System.currentTimeMillis();
+        // 返信用のIntentを作成する
+        Intent resultIntent = new Intent();
+        resultIntent.putExtra(EXTRA_EXCERPT, memoText);
+        resultIntent.putExtra("SELECTED_CATEGORY_IDS", selectedCategoryIds);
 
-        if (currentMemoId == -1) {
-            Memo newMemo = new Memo(title, memoText, currentTime);
-            mMemoViewModel.insert(newMemo, selectedCategoryIds);
-            Toast.makeText(this, "メモが保存されました", Toast.LENGTH_SHORT).show();
-        } else {
-            Memo updatedMemo = new Memo(title, memoText, currentTime);
-            updatedMemo.setId((int) currentMemoId);
-            mMemoViewModel.update(updatedMemo, selectedCategoryIds);
-            Toast.makeText(this, "メモが更新されました", Toast.LENGTH_SHORT).show();
+        // もし編集モードなら、IDもIntentに追加する
+        if (currentMemoId != -1) {
+            resultIntent.putExtra(EXTRA_ID, currentMemoId);
         }
+
+        // 結果を「OK」としてセットする
+        setResult(RESULT_OK, resultIntent);
+
+        // 画面を閉じる
         finish();
     }
 }

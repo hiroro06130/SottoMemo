@@ -2,6 +2,7 @@ package com.example.sottomemo;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -112,6 +113,7 @@ public class MemoListFragment extends Fragment {
         memoEditLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
+                    Log.d("ACTIVITY_RESULT", "結果を受け取りました。Result Code: " + result.getResultCode());
                     if (result.getResultCode() == AppCompatActivity.RESULT_OK && result.getData() != null) {
                         Intent data = result.getData();
                         int id = data.getIntExtra(MemoEditActivity.EXTRA_ID, -1);
@@ -141,6 +143,8 @@ public class MemoListFragment extends Fragment {
         // ボタンやリストのリスナーをセットアップ
         fabNewMemo.setOnClickListener(v -> {
             Intent intent = new Intent(requireActivity(), MemoEditActivity.class);
+            // 新規作成なので、カテゴリIDのリストは空っぽのものを渡す
+            intent.putExtra("EXISTING_CATEGORY_IDS", new ArrayList<Long>());
             memoEditLauncher.launch(intent);
         });
         setupMenuProvider();

@@ -11,7 +11,6 @@ import com.google.gson.Gson;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -87,37 +86,18 @@ public class MemoRepository {
     void insert(Event event) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mEventDao.insert(event)); }
 
     // --- AI関連 ---
-
-    public AiParsedData analyzeTextWithAi(String text) {
-        // このメソッドの本体は、analyzeAndSaveに任せるので、今は何もしなくて良い
-        return null; // 後で修正します
-    }
-
     void analyzeAndSave(Memo memo) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
-            String prompt = "あなたは、入力されたテキストから「予定」と「ToDo」を抽出する、非常に優秀なアシスタントです。" +
-                    "以下のルールと例に厳密に従って、結果をJSON形式で出力してください。\n\n" +
-                    "ルール:\n" +
-                    "1. 予定は 'events' キー、ToDoは 'todos' キーに、それぞれ配列として格納してください。\n" +
-                    "2. 予定には 'summary' (件名), 'date' (YYYY-MM-DD形式), 'time' (HH:mm形式) を含めてください。\n" +
-                    "3. ToDoには 'description' (内容) を含めてください。\n" +
-                    "4. 該当する予定やToDoが一つもない場合は、必ず `{\"events\":[], \"todos\":[]}` という空のJSONを返してください。\n" +
-                    "5. 日付や曜日だけが書かれた名詞のメモ（例：「月曜 課題」「明日 会議」）も、文脈から判断してToDoや予定として解釈してください。\n" +
-                    "6. 余計な説明や前置きは一切不要です。JSONオブジェクトだけを出力してください。\n\n" +
-                    "例1:\n" +
-                    "入力テキスト: 「来週水曜14時にクライアントと打ち合わせ。あと、牛乳を買って帰る」\n" +
-                    "出力JSON: {\\\"events\\\":[{\\\"summary\\\":\\\"クライアントと打ち合わせ\\\",\\\"date\\\":\\\"2025-07-23\\\",\\\"time\\\":\\\"14:00\\\"}],\\\"todos\\\":[{\\\"description\\\":\\\"牛乳を買って帰る\\\"}]}\n\n" +
-                    "例2:\n" +
-                    "入力テキスト: 「明日部活」\n" +
-                    "出力JSON: {\\\"todos\\\":[{\\\"description\\\":\\\"部活\\\"}]}\n\n" +
-                    "例3:\n" +
-                    "入力テキスト: 「金曜 燃えるゴミ」\n" +
-                    "出力JSON: {\\\"todos\\\":[{\\\"description\\\":\\\"燃えるゴミを出す\\\"}]}\n\n" +
-                    "では、本番です。\n" +
-                    "入力テキスト:\n" +
+            String prompt = "あなたは入力された日本語のテキストを解析し、含まれる「予定(event)」と「ToDo(todo)」を抽出するエキスパートです。" +
+                    "以下のルールに厳密に従い、JSON形式で出力してください。\n\n" +
+                    "### ルール\n" +
+                    "1. 日時が明確なものは「events」の配列へ。それ以外のタスクは「todos」の配列へ。\n" +
+                    "2. eventsには「summary」(件名)、「date」(YYYY-MM-DD)、「time」(HH:mm)を必ず含める。時間がなければtimeは「終日」。\n" +
+                    "3. todosには「description」(内容)を必ず含める。「明日部活」のような名詞句からも「部活」のように適切に内容を抽出する。\n" +
+                    "4. 該当がなければ `{\"events\":[], \"todos\":[]}` を返す。\n" +
+                    "5. あなたの回答はJSONオブジェクトのみ。説明は一切不要。\n\n" +
+                    "### 解析対象テキスト\n" +
                     "「" + memo.getExcerpt() + "」";
-
-
             try {
                 Response<GeminiResponse> response = ApiClient.getApiService()
                         .generateContent(BuildConfig.GEMINI_API_KEY, new GeminiRequest(prompt))
@@ -133,12 +113,16 @@ public class MemoRepository {
 
                     if (result.todos != null && !result.todos.isEmpty()) {
                         for (AiParsedData.AiTodo aiTodo : result.todos) {
-                            mTodoDao.insert(new Todo(aiTodo.description, false));
+                            if(aiTodo.description != null && !aiTodo.description.isEmpty()){
+                                mTodoDao.insert(new Todo(aiTodo.description, false));
+                                Log.d("AI_SAVE", "Saved ToDo: " + aiTodo.description);
+                            }
                         }
                     }
                     if (result.events != null && !result.events.isEmpty()) {
                         for (AiParsedData.AiEvent aiEvent : result.events) {
                             try {
+                                if (aiEvent.date == null || aiEvent.summary == null || aiEvent.time == null) continue;
                                 String dateTimeString = aiEvent.date + " " + aiEvent.time;
                                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
                                 sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -146,6 +130,7 @@ public class MemoRepository {
                                 if (eventDate != null) {
                                     Event newEvent = new Event(aiEvent.summary, aiEvent.time, eventDate.getTime());
                                     mEventDao.insert(newEvent);
+                                    Log.d("AI_SAVE", "Saved Event: " + newEvent.title);
                                 }
                             } catch (ParseException e) {
                                 Log.e("AI_SAVE", "Failed to parse date-time: " + aiEvent.date + " " + aiEvent.time, e);

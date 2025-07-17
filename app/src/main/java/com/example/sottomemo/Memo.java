@@ -8,7 +8,7 @@ import androidx.room.PrimaryKey;
 public class Memo {
 
     @PrimaryKey(autoGenerate = true)
-    private int id;
+    private long id;
 
     @ColumnInfo(name = "title")
     private String title;
@@ -27,11 +27,11 @@ public class Memo {
         this.lastModified = lastModified;
     }
 
-    public int getId() {
+    public long getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(long id) {
         this.id = id;
     }
 
