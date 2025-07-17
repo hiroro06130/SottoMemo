@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView;
 public class TodoAdapter extends ListAdapter<Todo, TodoAdapter.TodoViewHolder> {
 
     private OnTodoCheckedChangeListener listener;
+    private OnItemClickListener clickListener; // タップイベント用のリスナーを追加
 
     protected TodoAdapter() {
         super(DIFF_CALLBACK);
@@ -30,7 +31,8 @@ public class TodoAdapter extends ListAdapter<Todo, TodoAdapter.TodoViewHolder> {
     @Override
     public void onBindViewHolder(@NonNull TodoViewHolder holder, int position) {
         Todo currentTodo = getItem(position);
-        holder.bind(currentTodo, listener);
+        // bindメソッドにclickListenerを渡すように変更
+        holder.bind(currentTodo, listener, clickListener);
     }
 
     static class TodoViewHolder extends RecyclerView.ViewHolder {
@@ -43,10 +45,10 @@ public class TodoAdapter extends ListAdapter<Todo, TodoAdapter.TodoViewHolder> {
             textViewTitle = itemView.findViewById(R.id.text_view_todo_title);
         }
 
-        public void bind(final Todo todo, final OnTodoCheckedChangeListener listener) {
+        // bindメソッドの引数にclickListenerを追加
+        public void bind(final Todo todo, final OnTodoCheckedChangeListener listener, final OnItemClickListener clickListener) {
             textViewTitle.setText(todo.getTitle());
 
-            // 完了状態に応じて、打ち消し線などの見た目を設定する
             if (todo.isCompleted()) {
                 textViewTitle.setPaintFlags(textViewTitle.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
                 textViewTitle.setAlpha(0.5f);
@@ -55,15 +57,20 @@ public class TodoAdapter extends ListAdapter<Todo, TodoAdapter.TodoViewHolder> {
                 textViewTitle.setAlpha(1.0f);
             }
 
-            // プログラムがチェック状態を設定する際に、リスナーが誤作動しないように、一旦クリアする
             checkBox.setOnCheckedChangeListener(null);
-            // データに基づいてチェック状態を設定する
             checkBox.setChecked(todo.isCompleted());
 
-            // ユーザーが操作したときのための、新しいリスナーをセットする
             checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 if (listener != null) {
                     listener.onTodoCheckedChanged(todo, isChecked);
+                }
+            });
+
+            // ★ここからが追加部分★
+            // itemView（リストの各行）がタップされた時の処理
+            itemView.setOnClickListener(v -> {
+                if (clickListener != null) {
+                    clickListener.onItemClick(todo);
                 }
             });
         }
@@ -81,6 +88,17 @@ public class TodoAdapter extends ListAdapter<Todo, TodoAdapter.TodoViewHolder> {
                     oldItem.isCompleted() == newItem.isCompleted();
         }
     };
+
+    // ★ここからが追加部分★
+    // 外部（Fragment）からタップイベントを受け取るためのインターフェース
+    public interface OnItemClickListener {
+        void onItemClick(Todo todo);
+    }
+
+    public void setOnItemClickListener(OnItemClickListener listener) {
+        this.clickListener = listener;
+    }
+    // ★追加部分ここまで★
 
     public interface OnTodoCheckedChangeListener {
         void onTodoCheckedChanged(Todo todo, boolean isChecked);

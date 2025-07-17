@@ -12,13 +12,15 @@ public class Todo {
 
     private String title;
     private boolean isCompleted;
+    private long memoId; // 親となるメモのID
 
     public Todo() {}
 
     @Ignore
-    public Todo(String title, boolean isCompleted) {
+    public Todo(String title, boolean isCompleted, long memoId) {
         this.title = title;
         this.isCompleted = isCompleted;
+        this.memoId = memoId;
     }
 
     public long getId() { return id; }
@@ -27,4 +29,8 @@ public class Todo {
     public void setTitle(String title) { this.title = title; }
     public boolean isCompleted() { return isCompleted; }
     public void setCompleted(boolean completed) { this.isCompleted = completed; }
+
+    // ★★★ エラーの原因は、以下の2つのメソッドがなかったことです ★★★
+    public long getMemoId() { return memoId; }
+    public void setMemoId(long memoId) { this.memoId = memoId; }
 }

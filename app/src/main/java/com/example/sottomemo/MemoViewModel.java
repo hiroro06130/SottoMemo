@@ -53,20 +53,23 @@ public class MemoViewModel extends AndroidViewModel {
     public LiveData<List<MemoWithCategories>> getFilteredMemos() { return mFilteredMemos; }
     public void setSearchQuery(String query) { searchQuery.setValue(query); }
     public LiveData<MemoWithCategories> getMemoWithCategories(long memoId) { return mRepository.getMemoWithCategories(memoId); }
+
+    // ★修正：insertとupdateに処理を集約
     public void insert(Memo memo, List<Long> categoryIds) {
-        mRepository.insert(memo, categoryIds);
-        mRepository.analyzeAndSave(memo);
+        mRepository.insertAndAnalyze(memo, categoryIds);
     }
     public void update(Memo memo, List<Long> categoryIds) {
-        mRepository.update(memo, categoryIds);
-        mRepository.analyzeAndSave(memo);
+        mRepository.updateAndAnalyze(memo, categoryIds);
     }
+
     public void delete(Memo memo) { mRepository.delete(memo); }
     public void deleteMemos(List<Memo> memos) { mRepository.deleteMemos(memos); }
 
     // --- ToDo関連 ---
     public LiveData<List<Todo>> getAllTodos() { return mAllTodos; }
+    public void insert(Todo todo) { mRepository.insert(todo); }
     public void update(Todo todo) { mRepository.update(todo); }
+    public void delete(Todo todo) { mRepository.delete(todo); }
 
     // --- カテゴリ関連 ---
     public LiveData<List<Category>> getAllCategories() { return mAllCategories; }
@@ -75,4 +78,7 @@ public class MemoViewModel extends AndroidViewModel {
     // --- Event関連 ---
     public LiveData<List<Event>> getEventsForSelectedDate() { return eventsForSelectedDate; }
     public void setSelectedDate(long date) { selectedDate.setValue(date); }
+    public void insert(Event event) { mRepository.insert(event); }
+    public void update(Event event) { mRepository.update(event); }
+    public void delete(Event event) { mRepository.delete(event); }
 }

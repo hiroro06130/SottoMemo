@@ -12,18 +12,19 @@ public class Event {
     public String title;
     public String time;
     public long eventDate;
+    public long memoId;
 
     // Roomが使うための空のコンストラクタ
     public Event() {}
 
     // 私たちがプログラムで使うコンストラクタに@Ignoreを付ける
     @Ignore
-    public Event(String title, String time, long eventDate) {
+    public Event(String title, String time, long eventDate, long memoId) {
         this.title = title;
         this.time = time;
         this.eventDate = eventDate;
+        this.memoId = memoId;
     }
-
     public long getId() { return id; }
     public void setId(long id) { this.id = id; }
     public String getTitle() { return title; }

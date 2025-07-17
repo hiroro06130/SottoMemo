@@ -26,12 +26,4 @@ public class AiParsedData {
         @SerializedName("time")
         public String time;
     }
-
-
-
-        @SerializedName("date")
-        public String date; // "2025-07-04" のような形式
-
-        @SerializedName("time")
-        public String time; // "19:00" のような形式
-    }
+}
