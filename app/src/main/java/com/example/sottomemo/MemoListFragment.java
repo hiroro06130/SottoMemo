@@ -1,6 +1,7 @@
 package com.example.sottomemo;
 
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -27,15 +28,17 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+// ★★★ 不足していたimport文をここに追加しました ★★★
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+// ★★★ ここまで ★★★
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.snackbar.Snackbar;
 
 import java.io.Serializable;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 public class MemoListFragment extends Fragment {
 
@@ -45,6 +48,7 @@ public class MemoListFragment extends Fragment {
     private MemoAdapter memoAdapter;
     private ActivityResultLauncher<Intent> memoEditLauncher;
     private ActionMode mActionMode;
+    private ChipGroup chipGroupFilter;
 
     private ActionMode.Callback mActionModeCallback = new ActionMode.Callback() {
         @Override
@@ -88,7 +92,6 @@ public class MemoListFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        // onCreateViewでは、レイアウトを生成するだけ
         return inflater.inflate(R.layout.fragment_memo_list, container, false);
     }
 
@@ -96,30 +99,29 @@ public class MemoListFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // UI部品のセットアップ
         recyclerView = view.findViewById(R.id.recycler_view_memos);
         fabNewMemo = view.findViewById(R.id.fab_new_memo);
+        chipGroupFilter = view.findViewById(R.id.chip_group_filter);
         memoAdapter = new MemoAdapter();
         recyclerView.setAdapter(memoAdapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
-        // ViewModelのセットアップ
         mMemoViewModel = new ViewModelProvider(requireActivity()).get(MemoViewModel.class);
         mMemoViewModel.getFilteredMemos().observe(getViewLifecycleOwner(), memoWithCategories -> {
             memoAdapter.submitList(memoWithCategories);
         });
 
-        // 結果受け取りランチャーのセットアップ
+        setupCategoryFilterChips();
+
         memoEditLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     Log.d("ACTIVITY_RESULT", "結果を受け取りました。Result Code: " + result.getResultCode());
                     if (result.getResultCode() == AppCompatActivity.RESULT_OK && result.getData() != null) {
                         Intent data = result.getData();
-                        int id = data.getIntExtra(MemoEditActivity.EXTRA_ID, -1);
+                        long id = data.getLongExtra(MemoEditActivity.EXTRA_ID, -1L);
                         String memoText = data.getStringExtra(MemoEditActivity.EXTRA_EXCERPT);
 
-                        // SerializableとしてArrayList<Long>を受け取る
                         Serializable serializableExtra = data.getSerializableExtra("SELECTED_CATEGORY_IDS");
                         List<Long> selectedCategoryIds = (serializableExtra instanceof List) ? (List<Long>) serializableExtra : new ArrayList<>();
 
@@ -140,10 +142,8 @@ public class MemoListFragment extends Fragment {
                     }
                 });
 
-        // ボタンやリストのリスナーをセットアップ
         fabNewMemo.setOnClickListener(v -> {
             Intent intent = new Intent(requireActivity(), MemoEditActivity.class);
-            // 新規作成なので、カテゴリIDのリストは空っぽのものを渡す
             intent.putExtra("EXISTING_CATEGORY_IDS", new ArrayList<Long>());
             memoEditLauncher.launch(intent);
         });
@@ -151,6 +151,50 @@ public class MemoListFragment extends Fragment {
         setupClickListeners();
         setupSwipeToDelete();
     }
+
+    private void setupCategoryFilterChips() {
+        mMemoViewModel.getAllCategories().observe(getViewLifecycleOwner(), categories -> {
+            chipGroupFilter.removeAllViews();
+
+            Chip allChip = new Chip(requireContext());
+            allChip.setText("すべて");
+            allChip.setCheckable(true);
+            allChip.setChecked(true);
+            allChip.setId(View.generateViewId());
+            chipGroupFilter.addView(allChip);
+
+            for (Category category : categories) {
+                Chip chip = new Chip(requireContext());
+                chip.setText(category.name);
+                chip.setTag(category.categoryId);
+                chip.setCheckable(true);
+                chip.setChipBackgroundColor(ColorStateList.valueOf(category.color).withAlpha(40));
+                chip.setChipStrokeWidth(0);
+                chip.setTextColor(category.color);
+                chip.setId(View.generateViewId());
+                chipGroupFilter.addView(chip);
+            }
+
+            chipGroupFilter.setOnCheckedChangeListener((group, checkedId) -> {
+                if (checkedId == View.NO_ID) { // 何も選択されていない状態 (API 26+)
+                    mMemoViewModel.setCategoryFilter(null);
+                    allChip.setChecked(true); // 強制的に「すべて」に戻す
+                    return;
+                }
+
+                Chip checkedChip = group.findViewById(checkedId);
+                if(checkedChip == null) return; // 念のため
+
+                if (checkedChip.getText().toString().equals("すべて")) {
+                    mMemoViewModel.setCategoryFilter(null);
+                } else {
+                    Long categoryId = (Long) checkedChip.getTag();
+                    mMemoViewModel.setCategoryFilter(categoryId);
+                }
+            });
+        });
+    }
+
 
     private void setupMenuProvider() {
         requireActivity().addMenuProvider(new MenuProvider() {

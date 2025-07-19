@@ -3,6 +3,10 @@ package com.example.sottomemo;
 import android.app.Application;
 import android.util.Log;
 import androidx.lifecycle.LiveData;
+import androidx.work.Data;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkManager;
+
 import com.example.sottomemo.api.AiParsedData;
 import com.example.sottomemo.api.ApiClient;
 import com.example.sottomemo.api.GeminiRequest;
@@ -25,8 +29,11 @@ public class MemoRepository {
     private final LiveData<List<MemoWithCategories>> mAllMemos;
     private final LiveData<List<Todo>> mAllTodos;
     private final LiveData<List<Category>> mAllCategories;
+    private final WorkManager mWorkManager;
+    private final Application mApplication;
 
     MemoRepository(Application application) {
+        mApplication = application;
         MemoRoomDatabase db = MemoRoomDatabase.getDatabase(application);
         mMemoDao = db.memoDao();
         mTodoDao = db.todoDao();
@@ -35,12 +42,13 @@ public class MemoRepository {
         mAllMemos = mMemoDao.getAllMemosWithCategories();
         mAllTodos = mTodoDao.getAllTodos();
         mAllCategories = mCategoryDao.getAllCategories();
+        mWorkManager = WorkManager.getInstance(application);
     }
 
     // --- メモ関連（ViewModelから呼び出す処理） ---
+    // ★★★ ここがタイポの修正箇所です！ "Mosenos" -> "Memos" ★★★
     LiveData<List<MemoWithCategories>> getAllMemosWithCategories() { return mAllMemos; }
-    LiveData<List<MemoWithCategories>> searchMemosWithCategories(String searchQuery) { return mMemoDao.searchMemosWithCategories(searchQuery); }
-    LiveData<MemoWithCategories> getMemoWithCategories(long memoId) { return mMemoDao.getMemoWithCategories(memoId); }
+    LiveData<List<MemoWithCategories>> getMemosByCategoryId(long categoryId) { return mMemoDao.getMemosByCategoryId(categoryId); }
     void delete(Memo memo) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mMemoDao.delete(memo)); }
     void deleteMemos(List<Memo> memos) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mMemoDao.deleteMemos(memos)); }
 
@@ -58,8 +66,7 @@ public class MemoRepository {
                     mMemoDao.insertMemoCategoryCrossRef(crossRef);
                 }
             }
-            // ★変更：privateメソッドのanalyzeAndSaveを呼び出す
-            analyzeAndSave(memo);
+            startAiAnalysisWorker(memoId);
         });
     }
 
@@ -79,11 +86,20 @@ public class MemoRepository {
                     mMemoDao.insertMemoCategoryCrossRef(crossRef);
                 }
             }
-            // ★変更：privateメソッドのanalyzeAndSaveを呼び出す
-            analyzeAndSave(memo);
+            startAiAnalysisWorker(memo.getId());
         });
     }
 
+    private void startAiAnalysisWorker(long memoId) {
+        Data inputData = new Data.Builder()
+                .putLong(AiAnalysisWorker.KEY_MEMO_ID, memoId)
+                .build();
+        OneTimeWorkRequest analysisWorkRequest = new OneTimeWorkRequest.Builder(AiAnalysisWorker.class)
+                .setInputData(inputData)
+                .build();
+        mWorkManager.enqueue(analysisWorkRequest);
+        Log.d("MemoRepository", "AiAnalysisWorkerをキューに追加しました。MemoID: " + memoId);
+    }
 
     // --- ToDo・Event・カテゴリの単純操作 ---
     LiveData<List<Todo>> getAllTodos() { return mAllTodos; }
@@ -100,9 +116,14 @@ public class MemoRepository {
     void delete(Event event) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mEventDao.delete(event)); }
 
 
-    // ★修正：AI解析のコアロジックをprivateメソッドに分離し、デバッグログを完全復元
-    private void analyzeAndSave(Memo memo) {
-        // このメソッドはバックグラウンドスレッドから呼び出される想定
+    // --- AI解析のコアロジック（Workerから呼び出される） ---
+    public void analyzeAndSaveFromWorker(long memoId) {
+        Memo memo = mMemoDao.getMemoById(memoId);
+        if (memo == null) {
+            Log.e("AI_ANALYZE", "指定されたIDのメモが見つかりません: " + memoId);
+            return;
+        }
+
         SimpleDateFormat promptSdf = new SimpleDateFormat("yyyy-MM-dd", Locale.JAPAN);
         String today = promptSdf.format(new Date());
 
@@ -126,7 +147,6 @@ public class MemoRepository {
                 "出力JSON: `{\"events\":[{\"summary\":\"企画書を提出\",\"date\":\"" + "（明日の日付）" + "\",\"time\":\"終日\"}, {\"summary\":\"鈴木さんと打ち合わせ\",\"date\":\"" + "（明日の日付）" + "\",\"time\":\"15:00\"}],\"todos\":[{\"description\":\"新しいイヤホンを買う\"}]}`\n\n" +
                 "### 解析対象テキスト\n" +
                 "「" + memo.getExcerpt() + "」";
-
         try {
             Log.d("AI_DEBUG", "--------------------------------------");
             Log.d("AI_DEBUG", "AIへのリクエストを開始します。対象メモID: " + memo.getId());
@@ -149,19 +169,18 @@ public class MemoRepository {
                 Log.d("AI_DEBUG", "クリーンアップしたJSON: " + jsonResponse);
 
                 AiParsedData result = new Gson().fromJson(jsonResponse, AiParsedData.class);
-
                 if (result == null) {
                     Log.e("AI_DEBUG", "JSONからAiParsedDataへの変換に失敗しました。");
                     return;
                 }
 
-                long memoId = memo.getId(); // 親となるメモのIDを取得
+                long currentMemoId = memo.getId();
 
                 if (result.todos != null && !result.todos.isEmpty()) {
                     Log.d("AI_DEBUG", "ToDoの処理を開始します。件数: " + result.todos.size());
                     for (AiParsedData.AiTodo aiTodo : result.todos) {
                         if(aiTodo.description != null && !aiTodo.description.isEmpty()){
-                            mTodoDao.insert(new Todo(aiTodo.description, false, memoId));
+                            mTodoDao.insert(new Todo(aiTodo.description, false, currentMemoId));
                             Log.d("AI_DEBUG", "ToDoを保存しました: " + aiTodo.description);
                         }
                     }
@@ -181,7 +200,6 @@ public class MemoRepository {
 
                             Date eventDate;
                             String displayTime = aiEvent.time;
-
                             if ("終日".equals(aiEvent.time)) {
                                 Log.d("AI_DEBUG", "終日の予定として処理します。");
                                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
@@ -196,7 +214,7 @@ public class MemoRepository {
                             }
 
                             if (eventDate != null) {
-                                Event newEvent = new Event(aiEvent.summary, displayTime, eventDate.getTime(), memoId);
+                                Event newEvent = new Event(aiEvent.summary, displayTime, eventDate.getTime(), currentMemoId);
                                 mEventDao.insert(newEvent);
                                 Log.d("AI_DEBUG", "Eventを保存しました: " + newEvent.title);
                             }
@@ -208,7 +226,7 @@ public class MemoRepository {
                     Log.d("AI_DEBUG", "Eventは見つかりませんでした。");
                 }
             } else {
-                Log.e("AI_DEBUG", "APIエラー: " + response.code() + " " + response.errorBody().string());
+                Log.e("AI_DEBUG", "APIエラー: " + response.code() + " " + (response.errorBody() != null ? response.errorBody().string() : "Unknown error"));
             }
         } catch (Exception e) {
             Log.e("AI_DEBUG", "AI解析処理中に予期せぬエラーが発生しました。", e);

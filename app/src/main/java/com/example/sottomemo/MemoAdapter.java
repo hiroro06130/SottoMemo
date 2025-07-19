@@ -8,13 +8,14 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
-import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -72,7 +73,7 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
 
     public class MemoViewHolder extends RecyclerView.ViewHolder {
         public TextView textViewTitle, textViewExcerpt, textViewDate;
-        public CardView cardView;
+        public MaterialCardView cardView;
         public ChipGroup chipGroup;
 
         public MemoViewHolder(@NonNull View itemView) {
@@ -81,7 +82,7 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
             textViewExcerpt = itemView.findViewById(R.id.text_view_excerpt);
             textViewDate = itemView.findViewById(R.id.text_view_date);
             chipGroup = itemView.findViewById(R.id.chip_group_item_categories);
-            cardView = (CardView) itemView;
+            cardView = (MaterialCardView) itemView;
 
             itemView.setOnClickListener(v -> {
                 int position = getAdapterPosition();
@@ -117,7 +118,6 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
                 cardView.setCardBackgroundColor(typedValue.data);
             }
 
-            // --- カテゴリチップの表示ロジックを修正 ---
             chipGroup.removeAllViews();
             if (item.categories != null && !item.categories.isEmpty()) {
                 chipGroup.setVisibility(View.VISIBLE);
@@ -125,17 +125,10 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
                     Chip chip = new Chip(context);
                     chip.setText(category.name);
 
-                    // チップの背景を透明にし、枠線で色を表現する
-                    chip.setChipBackgroundColorResource(android.R.color.transparent);
-                    chip.setChipStrokeWidth(3f);
-
-                    // テーマに合わせて枠線と文字色を設定
-                    TypedValue typedValue = new TypedValue();
-                    context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorPrimary, typedValue, true);
-                    chip.setChipStrokeColor(ColorStateList.valueOf(typedValue.data));
-
-                    context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnSurfaceVariant, typedValue, true);
-                    chip.setTextColor(typedValue.data);
+                    int categoryColor = category.color;
+                    chip.setChipBackgroundColor(ColorStateList.valueOf(categoryColor).withAlpha(40));
+                    chip.setChipStrokeWidth(0);
+                    chip.setTextColor(categoryColor);
 
                     chipGroup.addView(chip);
                 }
@@ -154,7 +147,6 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
         public boolean areContentsTheSame(@NonNull MemoWithCategories oldItem, @NonNull MemoWithCategories newItem) {
             if (!oldItem.memo.getExcerpt().equals(newItem.memo.getExcerpt())) return false;
             if (oldItem.memo.getLastModified() != newItem.memo.getLastModified()) return false;
-            // カテゴリリストの比較
             return new HashSet<>(oldItem.categories).equals(new HashSet<>(newItem.categories));
         }
     };

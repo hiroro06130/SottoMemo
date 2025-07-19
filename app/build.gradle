@@ -2,6 +2,20 @@ plugins {
     id 'com.android.application'
 }
 
+// ★★★ これが最も安全なAPIキー読み込み方法です ★★★
+def getSanitizedApiKey() {
+    Properties properties = new Properties()
+    def propertiesFile = project.rootProject.file('local.properties')
+    if (propertiesFile.exists()) {
+        properties.load(propertiesFile.newDataInputStream())
+    }
+    String apiKey = properties.getProperty('GEMINI_API_KEY', '')
+    if (apiKey.startsWith('"') && apiKey.endsWith('"')) {
+        apiKey = apiKey.substring(1, apiKey.length() - 1)
+    }
+    return apiKey
+}
+
 android {
     namespace 'com.example.sottomemo'
     compileSdk 34
@@ -15,12 +29,8 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        // local.propertiesからAPIキーを読み込む設定
-        Properties properties = new Properties()
-        if (project.rootProject.file('local.properties').exists()) {
-            properties.load(project.rootProject.file('local.properties').newDataInputStream())
-        }
-        buildConfigField "String", "GEMINI_API_KEY", "\"${properties.getProperty('GEMINI_API_KEY', '')}\""
+        // 上で定義した安全な関数を使って、キーをビルド設定に追加します
+        buildConfigField "String", "GEMINI_API_KEY", "\"${getSanitizedApiKey()}\""
     }
 
     buildTypes {
@@ -33,7 +43,6 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-    // buildConfigを有効にする設定
     buildFeatures {
         buildConfig true
     }
@@ -55,11 +64,16 @@ dependencies {
     // ViewModel
     def lifecycle_version = "2.7.0"
     implementation "androidx.lifecycle:lifecycle-viewmodel:$lifecycle_version"
+    implementation "androidx.lifecycle:lifecycle-livedata:$lifecycle_version"
 
     // Preference
     implementation "androidx.preference:preference:1.2.1"
 
+    // ★★★ WorkManagerのライブラリを追加します ★★★
+    implementation "androidx.work:work-runtime:2.9.0"
+
     // Retrofit & Gson for API communication
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }
