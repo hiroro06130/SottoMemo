@@ -12,6 +12,9 @@ import com.example.sottomemo.api.ApiClient;
 import com.example.sottomemo.api.GeminiRequest;
 import com.example.sottomemo.api.GeminiResponse;
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
+
+import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -21,6 +24,8 @@ import java.util.TimeZone;
 import retrofit2.Response;
 
 public class MemoRepository {
+
+    private static final String AI_DEBUG_TAG = "AI_ANALYSIS";
 
     private final MemoDao mMemoDao;
     private final TodoDao mTodoDao;
@@ -46,7 +51,6 @@ public class MemoRepository {
     }
 
     // --- メモ関連（ViewModelから呼び出す処理） ---
-    // ★★★ ここがタイポの修正箇所です！ "Mosenos" -> "Memos" ★★★
     LiveData<List<MemoWithCategories>> getAllMemosWithCategories() { return mAllMemos; }
     LiveData<List<MemoWithCategories>> getMemosByCategoryId(long categoryId) { return mMemoDao.getMemosByCategoryId(categoryId); }
     void delete(Memo memo) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mMemoDao.delete(memo)); }
@@ -118,118 +122,149 @@ public class MemoRepository {
 
     // --- AI解析のコアロジック（Workerから呼び出される） ---
     public void analyzeAndSaveFromWorker(long memoId) {
+        Log.d(AI_DEBUG_TAG, "==================================================");
+        Log.d(AI_DEBUG_TAG, "AI解析処理を開始します。対象メモID: " + memoId);
+        Log.d(AI_DEBUG_TAG, "==================================================");
+
         Memo memo = mMemoDao.getMemoById(memoId);
         if (memo == null) {
-            Log.e("AI_ANALYZE", "指定されたIDのメモが見つかりません: " + memoId);
+            Log.e(AI_DEBUG_TAG, "処理中断: 指定されたIDのメモが見つかりませんでした。 MemoID: " + memoId);
             return;
         }
+        Log.d(AI_DEBUG_TAG, "解析対象のメモを取得しました: " + memo.getExcerpt());
+
 
         SimpleDateFormat promptSdf = new SimpleDateFormat("yyyy-MM-dd", Locale.JAPAN);
         String today = promptSdf.format(new Date());
 
+        // ★★★★★★★★★★★★★★★★★★★ ここからがAIへの命令文の修正箇所です ★★★★★★★★★★★★★★★★★★★
         String prompt = "あなたは入力された日本語のテキストを解析し、含まれる「予定(event)」と「ToDo(todo)」を抽出するエキスパートです。" +
                 "以下のルールと事例に厳密に従い、JSON形式で出力してください。\n\n" +
                 "### 今日の日付\n" +
                 today + "\n\n" +
                 "### ルール\n" +
-                "1. **予定の結合**: 一つの文の中に日付や曜日と具体的な時間の両方が含まれる場合、それらを**必ず一つの予定として結合し、決して二つの予定に分割しないこと。**\n" +
-                "2. **文脈の維持**: 文中で一度「明日」や「来週月曜」などの日付が指定された場合、後続の文で新しい日付が指定されるまで、その日付が適用されるものとして解釈すること。\n" +
-                "3. **明確な振り分け**: 日付や曜日（「週末」なども含む）が少しでも言及されているものは「events」へ。純粋なタスクのみを「todos」へ振り分けること。\n" +
+                "1. **予定の定義**: カレンダーの特定の日時を確保するような、具体的な日付（例: 「明日」「10月25日」）や時刻（例: 「15時」「午前中」）が指定されているものを「events」へ分類すること。\n" +
+                "2. **ToDoの定義**: 純粋なタスク、または「今週中」「近いうちに」のような**曖昧な期限**を持つものは「todos」へ分類すること。\n" +
+                "3. **文脈の維持**: 文中で一度「明日」や「来週月曜」などの日付が指定された場合、後続の文で新しい日付が指定されるまで、その日付が適用されるものとして解釈すること。\n" +
                 "4. **日付の正規化**: 「明日」「来週」などの相対的な日付は、今日の日付を基準に絶対的な「YYYY-MM-DD」形式に変換すること。「週末」は次の土曜日と解釈すること。\n" +
                 "5. **Eventの形式**: eventsには「summary」(件名)、「date」(YYYY-MM-DD)、「time」(HH:mm)を必ず含める。時間がなければtimeは「終日」とすること。「午前中」なども「終日」と解釈してよい。\n" +
                 "6. **ToDoの形式**: todosには「description」(内容)を必ず含めること。\n" +
                 "7. **空の場合**: 該当がなければ `{\"events\":[], \"todos\":[]}` を返すこと。\n" +
                 "8. **出力形式**: あなたの回答はJSONオブジェクトのみとし、説明は一切不要とすること。\n\n" +
                 "### 事例\n" +
-                "入力テキスト: 「明日の15時から鈴木さんと打ち合わせ」\n" +
-                "出力JSON: `{\"events\":[{\"summary\":\"鈴木さんと打ち合わせ\",\"date\":\"" + "（明日の日付）" + "\",\"time\":\"15:00\"}],\"todos\":[]}`\n\n" +
+                "入力テキスト: 「明日の15時から鈴木さんと打ち合わせ。今週中にクリーニングを取りに行く」\n" +
+                "出力JSON: `{\"events\":[{\"summary\":\"鈴木さんと打ち合わせ\",\"date\":\"" + "（明日の日付）" + "\",\"time\":\"15:00\"}],\"todos\":[{\"description\":\"クリーニングを取りに行く\"}]}`\n\n" +
                 "入力テキスト: 「明日の午前中に企画書を提出。15時から鈴木さんと打ち合わせ。新しいイヤホンを買う」\n" +
                 "出力JSON: `{\"events\":[{\"summary\":\"企画書を提出\",\"date\":\"" + "（明日の日付）" + "\",\"time\":\"終日\"}, {\"summary\":\"鈴木さんと打ち合わせ\",\"date\":\"" + "（明日の日付）" + "\",\"time\":\"15:00\"}],\"todos\":[{\"description\":\"新しいイヤホンを買う\"}]}`\n\n" +
                 "### 解析対象テキスト\n" +
                 "「" + memo.getExcerpt() + "」";
-        try {
-            Log.d("AI_DEBUG", "--------------------------------------");
-            Log.d("AI_DEBUG", "AIへのリクエストを開始します。対象メモID: " + memo.getId());
-            Log.d("AI_DEBUG", "Prompt: \n" + prompt);
+        // ★★★★★★★★★★★★★★★★★★★ AIへの命令文の修正ここまで ★★★★★★★★★★★★★★★★★★★
 
-            Response<GeminiResponse> response = ApiClient.getApiService()
-                    .generateContent(BuildConfig.GEMINI_API_KEY, new GeminiRequest(prompt))
-                    .execute();
+        Log.d(AI_DEBUG_TAG, "[リクエスト] AIへのプロンプト:\n" + prompt);
 
-            if (response.isSuccessful() && response.body() != null) {
-                String jsonResponse = response.body().getResponseText();
-                Log.d("AI_DEBUG", "AIからの生レスポンス: " + jsonResponse);
+        ApiClient.getApiService()
+                .generateContent(BuildConfig.GEMINI_API_KEY, new GeminiRequest(prompt))
+                .enqueue(new retrofit2.Callback<GeminiResponse>() {
+                    @Override
+                    public void onResponse(retrofit2.Call<GeminiResponse> call, Response<GeminiResponse> response) {
+                        MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
+                            if (response.isSuccessful() && response.body() != null) {
+                                String jsonResponse = response.body().getResponseText();
+                                Log.d(AI_DEBUG_TAG, "[レスポンス] AIからの生JSON:\n" + jsonResponse);
 
-                if (jsonResponse == null) {
-                    Log.e("AI_DEBUG", "AIからのレスポンスが空です。");
-                    return;
-                }
+                                if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+                                    Log.e(AI_DEBUG_TAG, "処理中断: AIからのレスポンスが空です。");
+                                    return;
+                                }
 
-                jsonResponse = jsonResponse.replace("```json", "").replace("```", "").trim();
-                Log.d("AI_DEBUG", "クリーンアップしたJSON: " + jsonResponse);
+                                String cleanedJson = jsonResponse.replace("```json", "").replace("```", "").trim();
 
-                AiParsedData result = new Gson().fromJson(jsonResponse, AiParsedData.class);
-                if (result == null) {
-                    Log.e("AI_DEBUG", "JSONからAiParsedDataへの変換に失敗しました。");
-                    return;
-                }
+                                AiParsedData result;
+                                try {
+                                    result = new Gson().fromJson(cleanedJson, AiParsedData.class);
+                                } catch (JsonSyntaxException e) {
+                                    Log.e(AI_DEBUG_TAG, "処理中断: JSONの形式が正しくありません。", e);
+                                    return;
+                                }
 
-                long currentMemoId = memo.getId();
+                                if (result == null) {
+                                    Log.e(AI_DEBUG_TAG, "処理中断: JSONからJavaオブジェクトへの変換に失敗しました。");
+                                    return;
+                                }
 
-                if (result.todos != null && !result.todos.isEmpty()) {
-                    Log.d("AI_DEBUG", "ToDoの処理を開始します。件数: " + result.todos.size());
-                    for (AiParsedData.AiTodo aiTodo : result.todos) {
-                        if(aiTodo.description != null && !aiTodo.description.isEmpty()){
-                            mTodoDao.insert(new Todo(aiTodo.description, false, currentMemoId));
-                            Log.d("AI_DEBUG", "ToDoを保存しました: " + aiTodo.description);
-                        }
-                    }
-                } else {
-                    Log.d("AI_DEBUG", "ToDoは見つかりませんでした。");
-                }
+                                long currentMemoId = memo.getId();
 
-                if (result.events != null && !result.events.isEmpty()) {
-                    Log.d("AI_DEBUG", "Eventの処理を開始します。件数: " + result.events.size());
-                    for (AiParsedData.AiEvent aiEvent : result.events) {
-                        try {
-                            if (aiEvent.date == null || aiEvent.summary == null || aiEvent.time == null) {
-                                Log.w("AI_DEBUG", "Eventのデータが不完全です。スキップします。: " + aiEvent.summary);
-                                continue;
-                            }
-                            Log.d("AI_DEBUG", "処理中のEvent: " + aiEvent.summary + " / " + aiEvent.date + " / " + aiEvent.time);
+                                // ToDoの処理
+                                if (result.todos != null && !result.todos.isEmpty()) {
+                                    Log.d(AI_DEBUG_TAG, "[DB保存] ToDoの処理を開始します。件数: " + result.todos.size());
+                                    for (AiParsedData.AiTodo aiTodo : result.todos) {
+                                        if(aiTodo.description != null && !aiTodo.description.isEmpty()){
+                                            Todo newTodo = new Todo(aiTodo.description, false, currentMemoId);
+                                            mTodoDao.insert(newTodo);
+                                            Log.d(AI_DEBUG_TAG, "  -> ToDoを保存しました: " + newTodo.getTitle());
+                                        } else {
+                                            Log.w(AI_DEBUG_TAG, "  -> スキップ: ToDoの説明が空です。");
+                                        }
+                                    }
+                                } else {
+                                    Log.d(AI_DEBUG_TAG, "[DB保存] 抽出されたToDoはありませんでした。");
+                                }
 
-                            Date eventDate;
-                            String displayTime = aiEvent.time;
-                            if ("終日".equals(aiEvent.time)) {
-                                Log.d("AI_DEBUG", "終日の予定として処理します。");
-                                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-                                eventDate = sdf.parse(aiEvent.date);
+                                // Eventの処理
+                                if (result.events != null && !result.events.isEmpty()) {
+                                    Log.d(AI_DEBUG_TAG, "[DB保存] Eventの処理を開始します。件数: " + result.events.size());
+                                    for (AiParsedData.AiEvent aiEvent : result.events) {
+                                        if (aiEvent.date == null || aiEvent.summary == null || aiEvent.time == null) {
+                                            Log.w(AI_DEBUG_TAG, "  -> スキップ: Eventのデータが不完全です。 summary=" + aiEvent.summary + ", date=" + aiEvent.date + ", time=" + aiEvent.time);
+                                            continue;
+                                        }
+
+                                        try {
+                                            Date eventDate;
+                                            String displayTime = aiEvent.time;
+                                            if ("終日".equals(aiEvent.time)) {
+                                                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                                                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                                                eventDate = sdf.parse(aiEvent.date);
+                                            } else {
+                                                String dateTimeString = aiEvent.date + " " + aiEvent.time;
+                                                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+                                                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                                                eventDate = sdf.parse(dateTimeString);
+                                            }
+
+                                            if (eventDate != null) {
+                                                Event newEvent = new Event(aiEvent.summary, displayTime, eventDate.getTime(), currentMemoId);
+                                                mEventDao.insert(newEvent);
+                                                Log.d(AI_DEBUG_TAG, "  -> Eventを保存しました: " + newEvent.getTitle());
+                                            }
+                                        } catch (ParseException e) {
+                                            Log.e(AI_DEBUG_TAG, "  -> エラー: 日付/時刻の解析に失敗しました。 date=" + aiEvent.date + ", time=" + aiEvent.time, e);
+                                        }
+                                    }
+                                } else {
+                                    Log.d(AI_DEBUG_TAG, "[DB保存] 抽出されたEventはありませんでした。");
+                                }
+
+                                Log.d(AI_DEBUG_TAG, "==================================================");
+                                Log.d(AI_DEBUG_TAG, "AI解析とDB保存処理が正常に完了しました。");
+                                Log.d(AI_DEBUG_TAG, "==================================================");
+
                             } else {
-                                Log.d("AI_DEBUG", "時間指定の予定として処理します。");
-                                String dateTimeString = aiEvent.date + " " + aiEvent.time;
-                                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
-                                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-                                eventDate = sdf.parse(dateTimeString);
+                                try {
+                                    String errorBody = response.errorBody() != null ? response.errorBody().string() : "Unknown error";
+                                    Log.e(AI_DEBUG_TAG, "[APIエラー] " + response.code() + ": " + errorBody);
+                                } catch (IOException e) {
+                                    Log.e(AI_DEBUG_TAG, "[APIエラー] エラーレスポンスの読み込みに失敗しました。", e);
+                                }
                             }
-
-                            if (eventDate != null) {
-                                Event newEvent = new Event(aiEvent.summary, displayTime, eventDate.getTime(), currentMemoId);
-                                mEventDao.insert(newEvent);
-                                Log.d("AI_DEBUG", "Eventを保存しました: " + newEvent.title);
-                            }
-                        } catch (ParseException e) {
-                            Log.e("AI_DEBUG", "日付/時刻の解析に失敗しました: " + aiEvent.date + " " + aiEvent.time, e);
-                        }
+                        });
                     }
-                } else {
-                    Log.d("AI_DEBUG", "Eventは見つかりませんでした。");
-                }
-            } else {
-                Log.e("AI_DEBUG", "APIエラー: " + response.code() + " " + (response.errorBody() != null ? response.errorBody().string() : "Unknown error"));
-            }
-        } catch (Exception e) {
-            Log.e("AI_DEBUG", "AI解析処理中に予期せぬエラーが発生しました。", e);
-        }
+
+                    @Override
+                    public void onFailure(retrofit2.Call<GeminiResponse> call, Throwable t) {
+                        Log.e(AI_DEBUG_TAG, "[通信エラー] APIとの通信自体に失敗しました。", t);
+                    }
+                });
     }
 }
