@@ -1,5 +1,6 @@
 package com.example.sottomemo;
 
+import android.content.Intent;
 import android.os.Bundle;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
@@ -11,19 +12,24 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         setPreferencesFromResource(R.xml.root_preferences, rootKey);
 
-        // "theme"というキーを持つListPreferenceを見つける
+        // --- 1. テーマ設定の処理 ---
         ListPreference themePreference = findPreference("theme");
         if (themePreference != null) {
-            // 設定値が変更されたときのリスナーをセット
-            themePreference.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
-                @Override
-                public boolean onPreferenceChange(Preference preference, Object newValue) {
-                    // 新しい値（"light", "dark", "system"のいずれか）を取得
-                    String themeOption = (String) newValue;
-                    // ThemeManagerを使って、テーマを即座に適用
-                    ThemeManager.applyTheme(themeOption);
-                    return true; // trueを返すと、変更が保存される
-                }
+            themePreference.setOnPreferenceChangeListener((preference, newValue) -> {
+                String themeOption = (String) newValue;
+                ThemeManager.applyTheme(themeOption);
+                return true;
+            });
+        }
+
+        // --- 2. カテゴリ管理画面を開く処理 ---
+        Preference manageCategoriesPreference = findPreference("manage_categories");
+        if (manageCategoriesPreference != null) {
+            manageCategoriesPreference.setOnPreferenceClickListener(preference -> {
+                // CategoryManageActivity を開くための Intent を作成
+                Intent intent = new Intent(getActivity(), CategoryManageActivity.class);
+                startActivity(intent);
+                return true;
             });
         }
     }

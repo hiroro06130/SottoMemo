@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="12dp"
+    android:gravity="center_vertical"
+    android:background="?attr/selectableItemBackground">
+
+    <View
+        android:id="@+id/view_category_color"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:background="@drawable/ic_category_color_circle" />
+
+    <TextView
+        android:id="@+id/text_view_category_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="16dp"
+        android:text="カテゴリ名"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="16sp" />
+
+    <ImageView
+        android:id="@+id/button_category_menu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_more_vert"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:padding="8dp"
+        app:tint="?attr/colorOnSurfaceVariant"
+        android:contentDescription="メニュー" />
+
+</LinearLayout>

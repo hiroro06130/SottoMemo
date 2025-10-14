@@ -8,4 +8,11 @@
             app:entryValues="@array/theme_values"
             app:defaultValue="system" />
     </PreferenceCategory>
+
+    <PreferenceCategory app:title="データ管理">
+        <Preference
+            app:key="manage_categories"
+            app:title="カテゴリの管理"
+            app:summary="カテゴリの追加、編集、削除を行います" />
+    </PreferenceCategory>
 </PreferenceScreen>

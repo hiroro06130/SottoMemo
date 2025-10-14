@@ -114,6 +114,9 @@ public class MemoRepository {
     LiveData<List<Category>> getAllCategories() { return mCategoryDao.getAllCategories(); }
     void insert(Category category) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mCategoryDao.insert(category)); }
 
+    void update(Category category) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mCategoryDao.update(category)); }
+    void delete(Category category) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mCategoryDao.delete(category)); }
+
     LiveData<List<Event>> getEventsForDay(long startOfDay, long endOfDay) { return mEventDao.getEventsForDay(startOfDay, endOfDay); }
     void insert(Event event) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mEventDao.insert(event)); }
     void update(Event event) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mEventDao.update(event)); }

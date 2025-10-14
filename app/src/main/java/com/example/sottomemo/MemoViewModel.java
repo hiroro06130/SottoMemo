@@ -112,6 +112,9 @@ public class MemoViewModel extends AndroidViewModel {
     public LiveData<List<Category>> getAllCategories() { return mAllCategories; }
     public void insert(Category category) { mRepository.insert(category); }
 
+    public void update(Category category) { mRepository.update(category); }
+    public void delete(Category category) { mRepository.delete(category); }
+
     // --- Event関連 ---
     public LiveData<List<Event>> getEventsForSelectedDate() { return eventsForSelectedDate; }
     public void setSelectedDate(long date) { selectedDate.setValue(date); }

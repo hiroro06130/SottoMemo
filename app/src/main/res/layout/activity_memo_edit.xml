@@ -60,14 +60,33 @@
         android:textSize="16sp"
         android:importantForAutofill="no" />
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="カテゴリ"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="8dp"
-        android:textColor="?attr/colorOnSurfaceVariant"/>
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="カテゴリ"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
+            android:textColor="?attr/colorOnSurfaceVariant"/>
+
+        <TextView
+            android:id="@+id/button_manage_categories"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="管理"
+            android:textColor="?attr/colorPrimary"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="16dp"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackground"/>
+
+    </LinearLayout>
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -1,6 +1,7 @@
 package com.example.sottomemo;
 
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -29,27 +30,24 @@ public class MemoEditActivity extends AppCompatActivity {
     private MemoViewModel mMemoViewModel;
     private long currentMemoId = -1;
 
+    // ★★★★★★★★★ 1. 「管理」ボタン用の変数を追加 ★★★★★★★★★
+    private TextView buttonManageCategories;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_memo_edit);
 
-        // 1. UI部品を初期化する
         initializeViews();
-
-        // 2. ViewModelを、最初に初期化する
         mMemoViewModel = new ViewModelProvider(this).get(MemoViewModel.class);
 
-        // 3. Intentを取得する
         Intent intent = getIntent();
         if (intent.hasExtra(EXTRA_ID)) {
             currentMemoId = intent.getLongExtra(EXTRA_ID, -1L);
         }
 
-        // 4. ViewModelの準備ができた後で、カテゴリチップのセットアップを呼ぶ
         setupCategoryChips(intent);
 
-        // 5. 編集モードかどうかの判定と、テキストのセット
         if (currentMemoId != -1) {
             setTitle("メモの編集");
             String excerpt = intent.getStringExtra(EXTRA_EXCERPT);
@@ -58,9 +56,14 @@ public class MemoEditActivity extends AppCompatActivity {
             setTitle("新しいメモ");
         }
 
-        // 6. ボタンのリスナーを設定
         buttonSave.setOnClickListener(v -> saveMemo());
         buttonBack.setOnClickListener(v -> finish());
+
+        // ★★★★★★★★★ 3. 「管理」ボタンのクリック処理を追加 ★★★★★★★★★
+        buttonManageCategories.setOnClickListener(v -> {
+            Intent manageIntent = new Intent(MemoEditActivity.this, CategoryManageActivity.class);
+            startActivity(manageIntent);
+        });
     }
 
     private void initializeViews() {
@@ -68,6 +71,8 @@ public class MemoEditActivity extends AppCompatActivity {
         buttonSave = findViewById(R.id.button_save);
         buttonBack = findViewById(R.id.button_back);
         chipGroupCategories = findViewById(R.id.chip_group_categories);
+        // ★★★★★★★★★ 2. 「管理」ボタンをレイアウトから見つける ★★★★★★★★★
+        buttonManageCategories = findViewById(R.id.button_manage_categories);
     }
 
     private void setupCategoryChips(Intent intent) {
@@ -85,6 +90,13 @@ public class MemoEditActivity extends AppCompatActivity {
                 chip.setText(category.name);
                 chip.setCheckable(true);
                 chip.setTag(category.categoryId);
+
+                // ★★★★★★★★★ 4. チップに色を付ける処理を追加 ★★★★★★★★★
+                int categoryColor = category.color;
+                chip.setChipBackgroundColor(ColorStateList.valueOf(categoryColor).withAlpha(40)); // 背景色（半透明）
+                chip.setChipStrokeWidth(0); // 枠線を消す
+                chip.setTextColor(categoryColor); // 文字色
+
                 if (existingCategoryIds.contains(category.categoryId)) {
                     chip.setChecked(true);
                 }
@@ -100,8 +112,6 @@ public class MemoEditActivity extends AppCompatActivity {
             return;
         }
 
-        // --- 新しいロジック ---
-        // 選択されたカテゴリのIDをリストに集める
         ArrayList<Long> selectedCategoryIds = new ArrayList<>();
         for (int i = 0; i < chipGroupCategories.getChildCount(); i++) {
             Chip chip = (Chip) chipGroupCategories.getChildAt(i);
@@ -110,20 +120,15 @@ public class MemoEditActivity extends AppCompatActivity {
             }
         }
 
-        // 返信用のIntentを作成する
         Intent resultIntent = new Intent();
         resultIntent.putExtra(EXTRA_EXCERPT, memoText);
         resultIntent.putExtra("SELECTED_CATEGORY_IDS", selectedCategoryIds);
 
-        // もし編集モードなら、IDもIntentに追加する
         if (currentMemoId != -1) {
             resultIntent.putExtra(EXTRA_ID, currentMemoId);
         }
 
-        // 結果を「OK」としてセットする
         setResult(RESULT_OK, resultIntent);
-
-        // 画面を閉じる
         finish();
     }
 }
