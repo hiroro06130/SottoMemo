@@ -1,17 +1,23 @@
 package com.example.sottomemo;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.CalendarView;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity; // ★ 追加
+import androidx.appcompat.widget.Toolbar; // ★ 追加
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.ItemTouchHelper;
@@ -19,8 +25,13 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.tabs.TabLayout;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.List;
 import java.util.TimeZone;
+import java.util.stream.Collectors;
 
 public class ScheduleFragment extends Fragment {
 
@@ -34,6 +45,10 @@ public class ScheduleFragment extends Fragment {
     private RecyclerView recyclerViewTodos;
     private TodoAdapter todoAdapter;
     private MemoViewModel mMemoViewModel;
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable todoUpdateRunnable;
+    private List<Todo> allTodos = new ArrayList<>();
 
     @Nullable
     @Override
@@ -54,6 +69,12 @@ public class ScheduleFragment extends Fragment {
     }
 
     private void initializeViews(View view) {
+        // ★ 新しいツールバーの設定を追加 ★
+        Toolbar toolbar = view.findViewById(R.id.toolbar_schedule);
+        if (getActivity() instanceof AppCompatActivity) {
+            ((AppCompatActivity) getActivity()).setSupportActionBar(toolbar);
+        }
+
         tabLayout = view.findViewById(R.id.tab_layout_schedule);
         calendarPageLayout = view.findViewById(R.id.calendar_page_layout);
         todoPageLayout = view.findViewById(R.id.todo_page_layout);
@@ -63,6 +84,7 @@ public class ScheduleFragment extends Fragment {
         recyclerViewTodos = view.findViewById(R.id.recycler_view_todos);
     }
 
+    // (以下のメソッドは変更なし)
     private void setupTabs() {
         if (tabLayout.getTabCount() == 0) {
             tabLayout.addTab(tabLayout.newTab().setText("カレンダー"));
@@ -79,10 +101,8 @@ public class ScheduleFragment extends Fragment {
                     todoPageLayout.setVisibility(View.VISIBLE);
                 }
             }
-            @Override
-            public void onTabUnselected(TabLayout.Tab tab) {}
-            @Override
-            public void onTabReselected(TabLayout.Tab tab) {}
+            @Override public void onTabUnselected(TabLayout.Tab tab) {}
+            @Override public void onTabReselected(TabLayout.Tab tab) {}
         });
     }
 
@@ -99,9 +119,7 @@ public class ScheduleFragment extends Fragment {
             updateSelectedDate(year, month, dayOfMonth);
         });
 
-        eventAdapter.setOnItemClickListener(event -> {
-            showEditEventDialog(event);
-        });
+        eventAdapter.setOnItemClickListener(this::showEditEventDialog);
 
         setupEventItemTouchHelper();
 
@@ -148,6 +166,27 @@ public class ScheduleFragment extends Fragment {
         timeInput.setText(event.getTime());
         layout.addView(timeInput);
 
+        TextView reminderLabel = new TextView(requireContext());
+        reminderLabel.setText("通知タイミング");
+        reminderLabel.setPadding(0, 30, 0, 10);
+        layout.addView(reminderLabel);
+
+        final Spinner reminderSpinner = new Spinner(requireContext());
+        List<String> reminderOptions = new ArrayList<>(Arrays.asList("デフォルト設定", "通知しない", "予定の時刻", "5分前", "10分前", "30分前", "1時間前"));
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, reminderOptions);
+        reminderSpinner.setAdapter(adapter);
+        layout.addView(reminderSpinner);
+
+        int currentReminderMinutes = event.getCustomReminderMinutes();
+        int selection = 0;
+        if (currentReminderMinutes == -1) selection = 1;
+        else if (currentReminderMinutes == 0) selection = 2;
+        else if (currentReminderMinutes == 5) selection = 3;
+        else if (currentReminderMinutes == 10) selection = 4;
+        else if (currentReminderMinutes == 30) selection = 5;
+        else if (currentReminderMinutes == 60) selection = 6;
+        reminderSpinner.setSelection(selection);
+
         builder.setView(layout);
 
         builder.setPositiveButton("保存", (dialog, which) -> {
@@ -156,6 +195,17 @@ public class ScheduleFragment extends Fragment {
             if (!newTitle.trim().isEmpty() && !newTime.trim().isEmpty()) {
                 event.setTitle(newTitle);
                 event.setTime(newTime);
+
+                int selectedPosition = reminderSpinner.getSelectedItemPosition();
+                int newReminderMinutes = -2;
+                if (selectedPosition == 1) newReminderMinutes = -1;
+                else if (selectedPosition == 2) newReminderMinutes = 0;
+                else if (selectedPosition == 3) newReminderMinutes = 5;
+                else if (selectedPosition == 4) newReminderMinutes = 10;
+                else if (selectedPosition == 5) newReminderMinutes = 30;
+                else if (selectedPosition == 6) newReminderMinutes = 60;
+                event.setCustomReminderMinutes(newReminderMinutes);
+
                 mMemoViewModel.update(event);
             }
         });
@@ -164,28 +214,61 @@ public class ScheduleFragment extends Fragment {
         builder.show();
     }
 
-
     private void setupTodoList() {
         todoAdapter = new TodoAdapter();
         recyclerViewTodos.setLayoutManager(new LinearLayoutManager(requireContext()));
         recyclerViewTodos.setAdapter(todoAdapter);
 
         mMemoViewModel.getAllTodos().observe(getViewLifecycleOwner(), todos -> {
-            todoAdapter.submitList(todos);
+            allTodos = todos;
+            updateVisibleTodos();
         });
 
         todoAdapter.setOnTodoCheckedChangeListener((todo, isChecked) -> {
-            // ★修正：コンストラクタを新しいものに変更
-            Todo updatedTodo = new Todo(todo.getTitle(), isChecked, todo.getMemoId());
-            updatedTodo.setId(todo.getId());
-            mMemoViewModel.update(updatedTodo);
+            todo.setCompleted(isChecked);
+            if (isChecked) {
+                todo.setCompletionTimestamp(System.currentTimeMillis());
+            } else {
+                todo.setCompletionTimestamp(0);
+            }
+            mMemoViewModel.update(todo);
         });
 
-        todoAdapter.setOnItemClickListener(todo -> {
-            showEditTodoDialog(todo);
-        });
-
+        todoAdapter.setOnItemClickListener(this::showEditTodoDialog);
         setupTodoItemTouchHelper();
+    }
+
+    private void updateVisibleTodos() {
+        if (allTodos == null) return;
+        long tenMinutesInMillis = 10 * 60 * 1000;
+        long tenMinutesAgo = System.currentTimeMillis() - tenMinutesInMillis;
+        List<Todo> visibleTodos = allTodos.stream()
+                .filter(todo ->
+                        !todo.isCompleted() || todo.getCompletionTimestamp() > tenMinutesAgo
+                )
+                .collect(Collectors.toList());
+        todoAdapter.submitList(visibleTodos);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        todoUpdateRunnable = new Runnable() {
+            @Override
+            public void run() {
+                updateVisibleTodos();
+                handler.postDelayed(this, 60000);
+            }
+        };
+        handler.post(todoUpdateRunnable);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (todoUpdateRunnable != null) {
+            handler.removeCallbacks(todoUpdateRunnable);
+        }
     }
 
     private void setupTodoItemTouchHelper() {
@@ -195,13 +278,11 @@ public class ScheduleFragment extends Fragment {
             public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
                 return false;
             }
-
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
                 int position = viewHolder.getAdapterPosition();
                 Todo todoToDelete = todoAdapter.getCurrentList().get(position);
                 mMemoViewModel.delete(todoToDelete);
-
                 Snackbar.make(requireView(), "ToDoを削除しました", Snackbar.LENGTH_LONG)
                         .setAction("元に戻す", v -> mMemoViewModel.insert(todoToDelete))
                         .show();
@@ -212,31 +293,24 @@ public class ScheduleFragment extends Fragment {
     private void showEditTodoDialog(final Todo todo) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("ToDoの編集");
-
         final EditText input = new EditText(requireContext());
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         input.setText(todo.getTitle());
         builder.setView(input);
-
         builder.setPositiveButton("保存", (dialog, which) -> {
             String newTitle = input.getText().toString();
             if (!newTitle.trim().isEmpty()) {
-                // ★★★ ここが修正箇所です！ ★★★
-                // 元のToDoからmemoIdを引き継いで、新しいコンストラクタを呼び出します。
-                Todo updatedTodo = new Todo(newTitle, todo.isCompleted(), todo.getMemoId());
-                updatedTodo.setId(todo.getId());
-                mMemoViewModel.update(updatedTodo);
+                todo.setTitle(newTitle);
+                mMemoViewModel.update(todo);
             }
         });
         builder.setNegativeButton("キャンセル", (dialog, which) -> dialog.cancel());
-
         builder.show();
     }
 
     private void updateSelectedDate(int year, int month, int dayOfMonth) {
         String headerText = year + "年" + (month + 1) + "月" + dayOfMonth + "日";
         textViewSelectedDateHeader.setText(headerText + "の予定");
-
         Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         calendar.set(year, month, dayOfMonth, 0, 0, 0);
         calendar.set(Calendar.MILLISECOND, 0);

@@ -1,4 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
     <PreferenceCategory app:title="表示">
         <ListPreference
             app:key="theme"
@@ -9,10 +11,23 @@
             app:defaultValue="system" />
     </PreferenceCategory>
 
+    <PreferenceCategory app:title="通知設定">
+        <Preference
+            app:key="default_reminder_time"
+            app:title="デフォルトの通知タイミング"
+            app:summary="10分前" />
+
+        <Preference
+            app:key="summary_notification_time"
+            app:title="毎日のまとめ通知の時刻"
+            app:summary="午前8時00分" />
+    </PreferenceCategory>
+
     <PreferenceCategory app:title="データ管理">
         <Preference
             app:key="manage_categories"
             app:title="カテゴリの管理"
             app:summary="カテゴリの追加、編集、削除を行います" />
     </PreferenceCategory>
+
 </PreferenceScreen>

@@ -14,10 +14,12 @@ public class Event {
     public long eventDate;
     public long memoId;
 
-    // Roomが使うための空のコンストラクタ
+    // ★★★ 1. 個別リマインダー設定を保存する変数を追加 ★★★
+    // -2: デフォルト設定を使用, -1: 通知しない, 0以上: 指定した分数
+    public int customReminderMinutes = -2;
+
     public Event() {}
 
-    // 私たちがプログラムで使うコンストラクタに@Ignoreを付ける
     @Ignore
     public Event(String title, String time, long eventDate, long memoId) {
         this.title = title;
@@ -33,4 +35,8 @@ public class Event {
     public void setTime(String time) { this.time = time; }
     public long getEventDate() { return eventDate; }
     public void setEventDate(long eventDate) { this.eventDate = eventDate; }
+
+    // ★★★ 2. 新しい変数のためのメソッドを追加 ★★★
+    public int getCustomReminderMinutes() { return customReminderMinutes; }
+    public void setCustomReminderMinutes(int minutes) { this.customReminderMinutes = minutes; }
 }

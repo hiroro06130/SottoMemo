@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Database(entities = {Memo.class, Todo.class, Category.class, MemoCategoryCrossRef.class, Event.class}, version = 5, exportSchema = false)
+@Database(entities = {Memo.class, Todo.class, Category.class, MemoCategoryCrossRef.class, Event.class}, version = 7, exportSchema = false)
 public abstract class MemoRoomDatabase extends RoomDatabase {
 
     public abstract MemoDao memoDao();

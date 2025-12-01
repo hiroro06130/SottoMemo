@@ -12,7 +12,10 @@ public class Todo {
 
     private String title;
     private boolean isCompleted;
-    private long memoId; // 親となるメモのID
+    private long memoId;
+
+    // ★★★★★★★★★ 1. 完了時刻を保存する変数を追加 ★★★★★★★★★
+    private long completionTimestamp;
 
     public Todo() {}
 
@@ -21,6 +24,7 @@ public class Todo {
         this.title = title;
         this.isCompleted = isCompleted;
         this.memoId = memoId;
+        this.completionTimestamp = 0; // 初期値は0
     }
 
     public long getId() { return id; }
@@ -29,8 +33,10 @@ public class Todo {
     public void setTitle(String title) { this.title = title; }
     public boolean isCompleted() { return isCompleted; }
     public void setCompleted(boolean completed) { this.isCompleted = completed; }
-
-    // ★★★ エラーの原因は、以下の2つのメソッドがなかったことです ★★★
     public long getMemoId() { return memoId; }
     public void setMemoId(long memoId) { this.memoId = memoId; }
+
+    // ★★★★★★★★★ 2. 新しい変数のためのメソッドを追加 ★★★★★★★★★
+    public long getCompletionTimestamp() { return completionTimestamp; }
+    public void setCompletionTimestamp(long completionTimestamp) { this.completionTimestamp = completionTimestamp; }
 }

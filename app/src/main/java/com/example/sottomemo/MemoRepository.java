@@ -50,12 +50,35 @@ public class MemoRepository {
         mWorkManager = WorkManager.getInstance(application);
     }
 
-    // --- メモ関連（ViewModelから呼び出す処理） ---
+    // --- メモ関連 (変更なし) ---
     LiveData<List<MemoWithCategories>> getAllMemosWithCategories() { return mAllMemos; }
     LiveData<List<MemoWithCategories>> getMemosByCategoryId(long categoryId) { return mMemoDao.getMemosByCategoryId(categoryId); }
-    void delete(Memo memo) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mMemoDao.delete(memo)); }
-    void deleteMemos(List<Memo> memos) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mMemoDao.deleteMemos(memos)); }
 
+    void delete(Memo memo) {
+        MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
+            List<Event> eventsToDelete = mEventDao.getEventsByMemoIdSync(memo.getId());
+            for (Event event : eventsToDelete) {
+                ReminderManager.cancelEventReminder(mApplication, event); // WorkManager版を呼ぶ
+            }
+            mEventDao.deleteEventsByMemoId(memo.getId());
+            mTodoDao.deleteTodosByMemoId(memo.getId());
+            mMemoDao.delete(memo);
+        });
+    }
+
+    void deleteMemos(List<Memo> memos) {
+        MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
+            for (Memo memo : memos) {
+                List<Event> eventsToDelete = mEventDao.getEventsByMemoIdSync(memo.getId());
+                for (Event event : eventsToDelete) {
+                    ReminderManager.cancelEventReminder(mApplication, event); // WorkManager版を呼ぶ
+                }
+                mEventDao.deleteEventsByMemoId(memo.getId());
+                mTodoDao.deleteTodosByMemoId(memo.getId());
+            }
+            mMemoDao.deleteMemos(memos);
+        });
+    }
 
     void insertAndAnalyze(Memo memo, List<Long> categoryIds) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
@@ -77,8 +100,13 @@ public class MemoRepository {
     void updateAndAnalyze(Memo memo, List<Long> categoryIds) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
             mMemoDao.update(memo);
-
             mMemoDao.deleteCrossRefsForMemo(memo.getId());
+
+            List<Event> oldEvents = mEventDao.getEventsByMemoIdSync(memo.getId());
+            for (Event oldEvent : oldEvents) {
+                ReminderManager.cancelEventReminder(mApplication, oldEvent); // WorkManager版を呼ぶ
+            }
+
             mEventDao.deleteEventsByMemoId(memo.getId());
             mTodoDao.deleteTodosByMemoId(memo.getId());
 
@@ -105,7 +133,7 @@ public class MemoRepository {
         Log.d("MemoRepository", "AiAnalysisWorkerをキューに追加しました。MemoID: " + memoId);
     }
 
-    // --- ToDo・Event・カテゴリの単純操作 ---
+    // --- ToDo・カテゴリの単純操作 (変更なし) ---
     LiveData<List<Todo>> getAllTodos() { return mAllTodos; }
     void insert(Todo todo) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mTodoDao.insert(todo)); }
     void update(Todo todo) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mTodoDao.update(todo)); }
@@ -113,34 +141,48 @@ public class MemoRepository {
 
     LiveData<List<Category>> getAllCategories() { return mCategoryDao.getAllCategories(); }
     void insert(Category category) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mCategoryDao.insert(category)); }
-
     void update(Category category) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mCategoryDao.update(category)); }
     void delete(Category category) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mCategoryDao.delete(category)); }
 
+    // --- Event関連 (WorkManager版を呼ぶように) ---
     LiveData<List<Event>> getEventsForDay(long startOfDay, long endOfDay) { return mEventDao.getEventsForDay(startOfDay, endOfDay); }
-    void insert(Event event) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mEventDao.insert(event)); }
-    void update(Event event) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mEventDao.update(event)); }
-    void delete(Event event) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mEventDao.delete(event)); }
 
+    LiveData<Event> getNextEvent() {
+        return mEventDao.getNextEvent(System.currentTimeMillis());
+    }
+    void insert(Event event) {
+        MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
+            long id = mEventDao.insert(event);
+            event.setId(id);
+            ReminderManager.scheduleEventReminder(mApplication, event); // WorkManager版を呼ぶ
+        });
+    }
+    void update(Event event) {
+        MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
+            mEventDao.update(event);
+            ReminderManager.scheduleEventReminder(mApplication, event); // WorkManager版を呼ぶ
+        });
+    }
+    void delete(Event event) {
+        MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
+            ReminderManager.cancelEventReminder(mApplication, event); // WorkManager版を呼ぶ
+            mEventDao.delete(event);
+        });
+    }
 
-    // --- AI解析のコアロジック（Workerから呼び出される） ---
+    // --- AI解析のコアロジック ---
     public void analyzeAndSaveFromWorker(long memoId) {
         Log.d(AI_DEBUG_TAG, "==================================================");
         Log.d(AI_DEBUG_TAG, "AI解析処理を開始します。対象メモID: " + memoId);
         Log.d(AI_DEBUG_TAG, "==================================================");
-
         Memo memo = mMemoDao.getMemoById(memoId);
         if (memo == null) {
             Log.e(AI_DEBUG_TAG, "処理中断: 指定されたIDのメモが見つかりませんでした。 MemoID: " + memoId);
             return;
         }
         Log.d(AI_DEBUG_TAG, "解析対象のメモを取得しました: " + memo.getExcerpt());
-
-
         SimpleDateFormat promptSdf = new SimpleDateFormat("yyyy-MM-dd", Locale.JAPAN);
         String today = promptSdf.format(new Date());
-
-        // ★★★★★★★★★★★★★★★★★★★ ここからがAIへの命令文の修正箇所です ★★★★★★★★★★★★★★★★★★★
         String prompt = "あなたは入力された日本語のテキストを解析し、含まれる「予定(event)」と「ToDo(todo)」を抽出するエキスパートです。" +
                 "以下のルールと事例に厳密に従い、JSON形式で出力してください。\n\n" +
                 "### 今日の日付\n" +
@@ -153,7 +195,7 @@ public class MemoRepository {
                 "5. **Eventの形式**: eventsには「summary」(件名)、「date」(YYYY-MM-DD)、「time」(HH:mm)を必ず含める。時間がなければtimeは「終日」とすること。「午前中」なども「終日」と解釈してよい。\n" +
                 "6. **ToDoの形式**: todosには「description」(内容)を必ず含めること。\n" +
                 "7. **空の場合**: 該当がなければ `{\"events\":[], \"todos\":[]}` を返すこと。\n" +
-                "8. **出力形式**: あなたの回答はJSONオブジェクトのみとし、説明は一切不要とすること。\n\n" +
+                "8. **出力形式**: あなたの回答はJSONオブジェクトのみとし、説明は一切不要とすること。\n" +
                 "### 事例\n" +
                 "入力テキスト: 「明日の15時から鈴木さんと打ち合わせ。今週中にクリーニングを取りに行く」\n" +
                 "出力JSON: `{\"events\":[{\"summary\":\"鈴木さんと打ち合わせ\",\"date\":\"" + "（明日の日付）" + "\",\"time\":\"15:00\"}],\"todos\":[{\"description\":\"クリーニングを取りに行く\"}]}`\n\n" +
@@ -161,10 +203,7 @@ public class MemoRepository {
                 "出力JSON: `{\"events\":[{\"summary\":\"企画書を提出\",\"date\":\"" + "（明日の日付）" + "\",\"time\":\"終日\"}, {\"summary\":\"鈴木さんと打ち合わせ\",\"date\":\"" + "（明日の日付）" + "\",\"time\":\"15:00\"}],\"todos\":[{\"description\":\"新しいイヤホンを買う\"}]}`\n\n" +
                 "### 解析対象テキスト\n" +
                 "「" + memo.getExcerpt() + "」";
-        // ★★★★★★★★★★★★★★★★★★★ AIへの命令文の修正ここまで ★★★★★★★★★★★★★★★★★★★
-
         Log.d(AI_DEBUG_TAG, "[リクエスト] AIへのプロンプト:\n" + prompt);
-
         ApiClient.getApiService()
                 .generateContent(BuildConfig.GEMINI_API_KEY, new GeminiRequest(prompt))
                 .enqueue(new retrofit2.Callback<GeminiResponse>() {
@@ -174,14 +213,11 @@ public class MemoRepository {
                             if (response.isSuccessful() && response.body() != null) {
                                 String jsonResponse = response.body().getResponseText();
                                 Log.d(AI_DEBUG_TAG, "[レスポンス] AIからの生JSON:\n" + jsonResponse);
-
                                 if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
                                     Log.e(AI_DEBUG_TAG, "処理中断: AIからのレスポンスが空です。");
                                     return;
                                 }
-
                                 String cleanedJson = jsonResponse.replace("```json", "").replace("```", "").trim();
-
                                 AiParsedData result;
                                 try {
                                     result = new Gson().fromJson(cleanedJson, AiParsedData.class);
@@ -189,15 +225,11 @@ public class MemoRepository {
                                     Log.e(AI_DEBUG_TAG, "処理中断: JSONの形式が正しくありません。", e);
                                     return;
                                 }
-
                                 if (result == null) {
                                     Log.e(AI_DEBUG_TAG, "処理中断: JSONからJavaオブジェクトへの変換に失敗しました。");
                                     return;
                                 }
-
                                 long currentMemoId = memo.getId();
-
-                                // ToDoの処理
                                 if (result.todos != null && !result.todos.isEmpty()) {
                                     Log.d(AI_DEBUG_TAG, "[DB保存] ToDoの処理を開始します。件数: " + result.todos.size());
                                     for (AiParsedData.AiTodo aiTodo : result.todos) {
@@ -209,11 +241,7 @@ public class MemoRepository {
                                             Log.w(AI_DEBUG_TAG, "  -> スキップ: ToDoの説明が空です。");
                                         }
                                     }
-                                } else {
-                                    Log.d(AI_DEBUG_TAG, "[DB保存] 抽出されたToDoはありませんでした。");
                                 }
-
-                                // Eventの処理
                                 if (result.events != null && !result.events.isEmpty()) {
                                     Log.d(AI_DEBUG_TAG, "[DB保存] Eventの処理を開始します。件数: " + result.events.size());
                                     for (AiParsedData.AiEvent aiEvent : result.events) {
@@ -221,25 +249,31 @@ public class MemoRepository {
                                             Log.w(AI_DEBUG_TAG, "  -> スキップ: Eventのデータが不完全です。 summary=" + aiEvent.summary + ", date=" + aiEvent.date + ", time=" + aiEvent.time);
                                             continue;
                                         }
-
                                         try {
                                             Date eventDate;
                                             String displayTime = aiEvent.time;
+
+                                            // ★★★★★★★★★ ここが【時差バグ】の修正箇所です ★★★★★★★★★
                                             if ("終日".equals(aiEvent.time)) {
                                                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                                                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                                                // sdf.setTimeZone(TimeZone.getTimeZone("UTC")); // ← この行を削除！
                                                 eventDate = sdf.parse(aiEvent.date);
                                             } else {
                                                 String dateTimeString = aiEvent.date + " " + aiEvent.time;
                                                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
-                                                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                                                // sdf.setTimeZone(TimeZone.getTimeZone("UTC")); // ← この行を削除！
                                                 eventDate = sdf.parse(dateTimeString);
                                             }
+                                            // ★★★★★★★★★ 修正ここまで ★★★★★★★★★
 
                                             if (eventDate != null) {
                                                 Event newEvent = new Event(aiEvent.summary, displayTime, eventDate.getTime(), currentMemoId);
-                                                mEventDao.insert(newEvent);
-                                                Log.d(AI_DEBUG_TAG, "  -> Eventを保存しました: " + newEvent.getTitle());
+                                                long id = mEventDao.insert(newEvent);
+                                                newEvent.setId(id);
+                                                Log.d(AI_DEBUG_TAG, "  -> Eventを保存しました: " + newEvent.getTitle() + " (ID: " + id + ")");
+
+                                                ReminderManager.scheduleEventReminder(mApplication, newEvent); // WorkManager版を呼ぶ
+                                                Log.d(AI_DEBUG_TAG, "  -> リマインダーを予約しました。");
                                             }
                                         } catch (ParseException e) {
                                             Log.e(AI_DEBUG_TAG, "  -> エラー: 日付/時刻の解析に失敗しました。 date=" + aiEvent.date + ", time=" + aiEvent.time, e);
@@ -248,11 +282,9 @@ public class MemoRepository {
                                 } else {
                                     Log.d(AI_DEBUG_TAG, "[DB保存] 抽出されたEventはありませんでした。");
                                 }
-
                                 Log.d(AI_DEBUG_TAG, "==================================================");
                                 Log.d(AI_DEBUG_TAG, "AI解析とDB保存処理が正常に完了しました。");
                                 Log.d(AI_DEBUG_TAG, "==================================================");
-
                             } else {
                                 try {
                                     String errorBody = response.errorBody() != null ? response.errorBody().string() : "Unknown error";
@@ -263,7 +295,6 @@ public class MemoRepository {
                             }
                         });
                     }
-
                     @Override
                     public void onFailure(retrofit2.Call<GeminiResponse> call, Throwable t) {
                         Log.e(AI_DEBUG_TAG, "[通信エラー] APIとの通信自体に失敗しました。", t);

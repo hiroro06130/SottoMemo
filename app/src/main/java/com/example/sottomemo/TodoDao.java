@@ -24,4 +24,7 @@ public interface TodoDao {
 
     @Query("SELECT * from todo_table ORDER BY id ASC")
     LiveData<List<Todo>> getAllTodos();
+
+    @Query("SELECT COUNT(*) FROM todo_table WHERE isCompleted = 0")
+    int getIncompleteTodoCountSync();
 }
