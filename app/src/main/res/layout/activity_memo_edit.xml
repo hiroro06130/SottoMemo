@@ -14,35 +14,12 @@
         android:background="?attr/colorSurface"
         app:elevation="1dp">
 
-        <androidx.appcompat.widget.Toolbar
+        <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar_memo_edit"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize">
+            android:layout_height="?attr/actionBarSize"
+            app:navigationIcon="@drawable/ic_arrow_back" />
 
-            <ImageView
-                android:id="@+id/button_back"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:src="@drawable/ic_arrow_back"
-                android:paddingHorizontal="16dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="戻る"
-                app:tint="?attr/colorOnSurface" />
-
-            <TextView
-                android:id="@+id/button_save"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="保存"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:padding="10dp"
-                android:layout_gravity="end"
-                android:background="?attr/selectableItemBackground"
-                android:layout_marginEnd="16dp"/>
-
-        </androidx.appcompat.widget.Toolbar>
     </com.google.android.material.appbar.AppBarLayout>
 
     <EditText
@@ -75,18 +52,20 @@
             android:layout_marginTop="8dp"
             android:textColor="?attr/colorOnSurfaceVariant"/>
 
-        <TextView
+        <ImageView
             android:id="@+id/button_manage_categories"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="管理"
-            android:textColor="?attr/colorPrimary"
+            android:src="@drawable/ic_settings"
             android:layout_marginTop="8dp"
             android:layout_marginEnd="16dp"
             android:padding="8dp"
-            android:background="?attr/selectableItemBackground"/>
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="カテゴリを管理"
+            app:tint="?attr/colorOnSurfaceVariant"/>
 
     </LinearLayout>
+
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -39,4 +39,6 @@
         <item>8</item>
         <item>9</item>
     </string-array>
+
+    <string name="widget_description">次の予定を表示し、音声入力ですぐにメモを作成できます。</string>
 </resources>

@@ -7,6 +7,7 @@
 
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:name=".SottoMemoApplication"
@@ -29,7 +30,7 @@
             android:exported="false" />
         <activity
             android:name=".MemoEditActivity"
-            android:exported="false" />
+            android:exported="true" />
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -53,6 +54,35 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".NextScheduleWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/next_schedule_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".DailyListWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_daily_list_info" />
+        </receiver>
+
+        <service
+            android:name=".DailyListWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
     </application>
+
+
 
 </manifest>

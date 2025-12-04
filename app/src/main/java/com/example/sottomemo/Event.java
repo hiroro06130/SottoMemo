@@ -14,7 +14,6 @@ public class Event {
     public long eventDate;
     public long memoId;
 
-    // ★★★ 1. 個別リマインダー設定を保存する変数を追加 ★★★
     // -2: デフォルト設定を使用, -1: 通知しない, 0以上: 指定した分数
     public int customReminderMinutes = -2;
 
@@ -27,6 +26,7 @@ public class Event {
         this.eventDate = eventDate;
         this.memoId = memoId;
     }
+
     public long getId() { return id; }
     public void setId(long id) { this.id = id; }
     public String getTitle() { return title; }
@@ -36,7 +36,10 @@ public class Event {
     public long getEventDate() { return eventDate; }
     public void setEventDate(long eventDate) { this.eventDate = eventDate; }
 
-    // ★★★ 2. 新しい変数のためのメソッドを追加 ★★★
     public int getCustomReminderMinutes() { return customReminderMinutes; }
     public void setCustomReminderMinutes(int minutes) { this.customReminderMinutes = minutes; }
+
+    // ★★★ 今回のエラー修正で追加したメソッド ★★★
+    public long getMemoId() { return memoId; }
+    public void setMemoId(long memoId) { this.memoId = memoId; }
 }

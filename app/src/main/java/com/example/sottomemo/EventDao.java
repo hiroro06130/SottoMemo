@@ -37,4 +37,7 @@ public interface EventDao {
 
     @Query("SELECT * FROM event_table WHERE eventDate >= :currentTime ORDER BY eventDate ASC LIMIT 1")
     LiveData<Event> getNextEvent(long currentTime);
+
+    @Query("SELECT * FROM event_table WHERE eventDate >= :currentTime ORDER BY eventDate ASC LIMIT 1")
+    Event getNextEventSync(long currentTime);
 }
