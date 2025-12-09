@@ -3,6 +3,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/action_fix_text"
+        android:icon="@drawable/ic_auto_fix"
+        android:title="AI修正"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/action_voice_input"
         android:icon="@drawable/ic_mic"
         android:title="音声入力"

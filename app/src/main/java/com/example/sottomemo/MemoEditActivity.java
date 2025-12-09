@@ -95,6 +95,7 @@ public class MemoEditActivity extends AppCompatActivity {
         initializeSpeechRecognizer();
 
         if (intent.getBooleanExtra(EXTRA_START_VOICE_INPUT, false)) {
+            // UIの準備が整うのを少し待ってから開始
             editTextMemo.postDelayed(this::checkPermissionAndStartListening, 500);
         }
     }
@@ -159,7 +160,11 @@ public class MemoEditActivity extends AppCompatActivity {
         if (!isListening) {
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+
+            // ★★★ ここを修正しました！ 日本語 ("ja-JP") に固定 ★★★
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ja-JP");
+            // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
 
             speechRecognizer.startListening(intent);
@@ -203,16 +208,13 @@ public class MemoEditActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
-        // ★エラーの原因：ここが読み込めないとエラーになります
         inflater.inflate(R.menu.memo_edit_menu, menu);
-        // ★エラーの原因：ここも見つからないとエラーになります
         micMenuItem = menu.findItem(R.id.action_voice_input);
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        // ★エラーの原因：これらのIDが見つからないとエラーになります
         if (item.getItemId() == R.id.action_save_memo) {
             saveMemo();
             return true;
