@@ -95,7 +95,6 @@ public class MemoEditActivity extends AppCompatActivity {
         initializeSpeechRecognizer();
 
         if (intent.getBooleanExtra(EXTRA_START_VOICE_INPUT, false)) {
-            // UIの準備が整うのを少し待ってから開始
             editTextMemo.postDelayed(this::checkPermissionAndStartListening, 500);
         }
     }
@@ -132,7 +131,46 @@ public class MemoEditActivity extends AppCompatActivity {
                     ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                     if (matches != null && !matches.isEmpty()) {
                         String spokenText = matches.get(0);
-                        insertText(spokenText);
+
+                        // ★★★ 修正版ボイスコマンド判定 ★★★
+
+                        // 1. 特殊操作系コマンド（削除・クリア）
+                        // これらは「単体で」使われた時だけ反応するようにします（誤爆防止のため equals で判定）
+                        // または「消して」などの短いフレーズなら反応させます
+                        boolean isCommandExecuted = false;
+
+                        if (spokenText.equals("クリア") || spokenText.equals("全部消して") || spokenText.equals("全消去")) {
+                            editTextMemo.setText("");
+                            Toast.makeText(MemoEditActivity.this, "全て消去しました", Toast.LENGTH_SHORT).show();
+                            isCommandExecuted = true;
+                        } else if (spokenText.equals("削除") || spokenText.equals("消して") || spokenText.equals("戻って")) {
+                            deleteLastChar();
+                            Toast.makeText(MemoEditActivity.this, "⌫ 削除しました", Toast.LENGTH_SHORT).show();
+                            isCommandExecuted = true;
+                        }
+
+                        // コマンドが実行されなかった場合、テキスト入力処理を行う
+                        if (!isCommandExecuted) {
+                            String processedText = spokenText;
+
+                            // 2. 置換系コマンド（改行・スペース）
+                            // 文章の中に含まれるキーワードを、記号に置き換えます
+                            processedText = processedText.replace("改行", "\n")
+                                    .replace("開業", "\n")
+                                    .replace("会場", "\n");
+
+                            processedText = processedText.replace("スペース", " ")
+                                    .replace("空白", " ")
+                                    .replace("空けて", " ");
+
+                            // 加工後のテキストを入力
+                            insertText(processedText);
+
+                            // もし置換が行われていたらトーストで通知（任意）
+                            if (!spokenText.equals(processedText)) {
+                                // Toast.makeText(MemoEditActivity.this, "記号に変換しました", Toast.LENGTH_SHORT).show();
+                            }
+                        }
                     }
                     isListening = false;
                 }
@@ -160,11 +198,7 @@ public class MemoEditActivity extends AppCompatActivity {
         if (!isListening) {
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-
-            // ★★★ ここを修正しました！ 日本語 ("ja-JP") に固定 ★★★
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ja-JP");
-            // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ja-JP"); // 日本語固定
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
 
             speechRecognizer.startListening(intent);
@@ -195,6 +229,20 @@ public class MemoEditActivity extends AppCompatActivity {
         int start = Math.max(editTextMemo.getSelectionStart(), 0);
         int end = Math.max(editTextMemo.getSelectionEnd(), 0);
         editTextMemo.getText().replace(Math.min(start, end), Math.max(start, end), text);
+    }
+
+    // 直前の1文字を削除する便利メソッド
+    private void deleteLastChar() {
+        int start = Math.max(editTextMemo.getSelectionStart(), 0);
+        int end = Math.max(editTextMemo.getSelectionEnd(), 0);
+
+        if (start != end) {
+            // 範囲選択されている場合はその範囲を削除
+            editTextMemo.getText().delete(Math.min(start, end), Math.max(start, end));
+        } else if (start > 0) {
+            // カーソルが先頭でなければ、前の1文字を削除
+            editTextMemo.getText().delete(start - 1, start);
+        }
     }
 
     @Override
