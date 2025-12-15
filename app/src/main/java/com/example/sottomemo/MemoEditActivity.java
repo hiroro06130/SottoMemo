@@ -51,6 +51,9 @@ public class MemoEditActivity extends AppCompatActivity {
     private boolean isListening = false;
     private MenuItem micMenuItem;
 
+    // ★追加: リアルタイム表示のために、一時的に表示している文字数を記録する変数
+    private int lastPartialTextLength = 0;
+
     private final ActivityResultLauncher<String> requestPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
                 if (isGranted) {
@@ -107,6 +110,8 @@ public class MemoEditActivity extends AppCompatActivity {
                 public void onReadyForSpeech(Bundle params) {
                     Toast.makeText(MemoEditActivity.this, "お話しください...", Toast.LENGTH_SHORT).show();
                     updateMicIconState(true);
+                    // 毎回リセット
+                    lastPartialTextLength = 0;
                 }
                 @Override
                 public void onBeginningOfSpeech() {}
@@ -121,22 +126,42 @@ public class MemoEditActivity extends AppCompatActivity {
                 @Override
                 public void onError(int error) {
                     updateMicIconState(false);
+                    // 途中経過の文字が残っていたら消す
+                    deletePartialText();
                     if (error == SpeechRecognizer.ERROR_NO_MATCH) {
                         Toast.makeText(MemoEditActivity.this, "聞き取れませんでした", Toast.LENGTH_SHORT).show();
                     }
                     isListening = false;
                 }
+
+                // ★★★ リアルタイム表示（途中経過） ★★★
+                @Override
+                public void onPartialResults(Bundle partialResults) {
+                    ArrayList<String> matches = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                    if (matches != null && !matches.isEmpty()) {
+                        String text = matches.get(0);
+                        // 1. 直前の途中経過を消す
+                        deletePartialText();
+                        // 2. 新しい途中経過を表示
+                        insertText(text);
+                        // 3. 今回の長さを記録
+                        lastPartialTextLength = text.length();
+                    }
+                }
+
+                // ★★★ 確定結果 ★★★
                 @Override
                 public void onResults(Bundle results) {
                     ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                     if (matches != null && !matches.isEmpty()) {
                         String spokenText = matches.get(0);
 
-                        // ★★★ 修正版ボイスコマンド判定 ★★★
+                        // 1. 途中経過を消す
+                        deletePartialText();
+
+                        // 2. 確定した文章を入力（ボイスコマンド処理を含む）
 
                         // 1. 特殊操作系コマンド（削除・クリア）
-                        // これらは「単体で」使われた時だけ反応するようにします（誤爆防止のため equals で判定）
-                        // または「消して」などの短いフレーズなら反応させます
                         boolean isCommandExecuted = false;
 
                         if (spokenText.equals("クリア") || spokenText.equals("全部消して") || spokenText.equals("全消去")) {
@@ -173,9 +198,9 @@ public class MemoEditActivity extends AppCompatActivity {
                         }
                     }
                     isListening = false;
+                    lastPartialTextLength = 0;
                 }
-                @Override
-                public void onPartialResults(Bundle partialResults) {}
+
                 @Override
                 public void onEvent(int eventType, Bundle params) {}
             });
@@ -200,6 +225,9 @@ public class MemoEditActivity extends AppCompatActivity {
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ja-JP"); // 日本語固定
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+
+            // ★ リアルタイム表示を有効にする設定
+            intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
 
             speechRecognizer.startListening(intent);
             isListening = true;
@@ -229,6 +257,18 @@ public class MemoEditActivity extends AppCompatActivity {
         int start = Math.max(editTextMemo.getSelectionStart(), 0);
         int end = Math.max(editTextMemo.getSelectionEnd(), 0);
         editTextMemo.getText().replace(Math.min(start, end), Math.max(start, end), text);
+    }
+
+    // ★追加: 直前に入力した途中経過の文字を削除する処理
+    private void deletePartialText() {
+        if (lastPartialTextLength > 0) {
+            int end = editTextMemo.getSelectionEnd();
+            int start = Math.max(end - lastPartialTextLength, 0);
+            if (start < end) {
+                editTextMemo.getText().replace(start, end, "");
+            }
+            lastPartialTextLength = 0;
+        }
     }
 
     // 直前の1文字を削除する便利メソッド
