@@ -12,29 +12,44 @@ import android.speech.SpeechRecognizer;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.example.sottomemo.api.ApiClient;
+import com.example.sottomemo.api.Content;
+import com.example.sottomemo.api.GeminiApiService;
+import com.example.sottomemo.api.GeminiRequest;
+import com.example.sottomemo.api.GeminiResponse;
+import com.example.sottomemo.api.Part;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
-import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
 public class MemoEditActivity extends AppCompatActivity {
+
+    // ★★★ ここにAPIキーを入れてください ★★★
+    private static final String GEMINI_API_KEY = "AIzaSyC_qmCOhNd5YJ2rfCzfq0ZDsftVXjQaqSI";
 
     public static final String EXTRA_ID = "com.example.sottomemo.EXTRA_ID";
     public static final String EXTRA_EXCERPT = "com.example.sottomemo.EXTRA_EXCERPT";
@@ -50,8 +65,6 @@ public class MemoEditActivity extends AppCompatActivity {
     private SpeechRecognizer speechRecognizer;
     private boolean isListening = false;
     private MenuItem micMenuItem;
-
-    // ★追加: リアルタイム表示のために、一時的に表示している文字数を記録する変数
     private int lastPartialTextLength = 0;
 
     private final ActivityResultLauncher<String> requestPermissionLauncher =
@@ -110,7 +123,6 @@ public class MemoEditActivity extends AppCompatActivity {
                 public void onReadyForSpeech(Bundle params) {
                     Toast.makeText(MemoEditActivity.this, "お話しください...", Toast.LENGTH_SHORT).show();
                     updateMicIconState(true);
-                    // 毎回リセット
                     lastPartialTextLength = 0;
                 }
                 @Override
@@ -126,44 +138,30 @@ public class MemoEditActivity extends AppCompatActivity {
                 @Override
                 public void onError(int error) {
                     updateMicIconState(false);
-                    // 途中経過の文字が残っていたら消す
                     deletePartialText();
                     if (error == SpeechRecognizer.ERROR_NO_MATCH) {
                         Toast.makeText(MemoEditActivity.this, "聞き取れませんでした", Toast.LENGTH_SHORT).show();
                     }
                     isListening = false;
                 }
-
-                // ★★★ リアルタイム表示（途中経過） ★★★
                 @Override
                 public void onPartialResults(Bundle partialResults) {
                     ArrayList<String> matches = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                     if (matches != null && !matches.isEmpty()) {
                         String text = matches.get(0);
-                        // 1. 直前の途中経過を消す
                         deletePartialText();
-                        // 2. 新しい途中経過を表示
                         insertText(text);
-                        // 3. 今回の長さを記録
                         lastPartialTextLength = text.length();
                     }
                 }
-
-                // ★★★ 確定結果 ★★★
                 @Override
                 public void onResults(Bundle results) {
                     ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                     if (matches != null && !matches.isEmpty()) {
                         String spokenText = matches.get(0);
-
-                        // 1. 途中経過を消す
                         deletePartialText();
 
-                        // 2. 確定した文章を入力（ボイスコマンド処理を含む）
-
-                        // 1. 特殊操作系コマンド（削除・クリア）
                         boolean isCommandExecuted = false;
-
                         if (spokenText.equals("クリア") || spokenText.equals("全部消して") || spokenText.equals("全消去")) {
                             editTextMemo.setText("");
                             Toast.makeText(MemoEditActivity.this, "全て消去しました", Toast.LENGTH_SHORT).show();
@@ -174,33 +172,20 @@ public class MemoEditActivity extends AppCompatActivity {
                             isCommandExecuted = true;
                         }
 
-                        // コマンドが実行されなかった場合、テキスト入力処理を行う
                         if (!isCommandExecuted) {
                             String processedText = spokenText;
-
-                            // 2. 置換系コマンド（改行・スペース）
-                            // 文章の中に含まれるキーワードを、記号に置き換えます
                             processedText = processedText.replace("改行", "\n")
                                     .replace("開業", "\n")
                                     .replace("会場", "\n");
-
                             processedText = processedText.replace("スペース", " ")
                                     .replace("空白", " ")
                                     .replace("空けて", " ");
-
-                            // 加工後のテキストを入力
                             insertText(processedText);
-
-                            // もし置換が行われていたらトーストで通知（任意）
-                            if (!spokenText.equals(processedText)) {
-                                // Toast.makeText(MemoEditActivity.this, "記号に変換しました", Toast.LENGTH_SHORT).show();
-                            }
                         }
                     }
                     isListening = false;
                     lastPartialTextLength = 0;
                 }
-
                 @Override
                 public void onEvent(int eventType, Bundle params) {}
             });
@@ -223,10 +208,8 @@ public class MemoEditActivity extends AppCompatActivity {
         if (!isListening) {
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ja-JP"); // 日本語固定
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ja-JP");
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-
-            // ★ リアルタイム表示を有効にする設定
             intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
 
             speechRecognizer.startListening(intent);
@@ -259,7 +242,6 @@ public class MemoEditActivity extends AppCompatActivity {
         editTextMemo.getText().replace(Math.min(start, end), Math.max(start, end), text);
     }
 
-    // ★追加: 直前に入力した途中経過の文字を削除する処理
     private void deletePartialText() {
         if (lastPartialTextLength > 0) {
             int end = editTextMemo.getSelectionEnd();
@@ -271,16 +253,12 @@ public class MemoEditActivity extends AppCompatActivity {
         }
     }
 
-    // 直前の1文字を削除する便利メソッド
     private void deleteLastChar() {
         int start = Math.max(editTextMemo.getSelectionStart(), 0);
         int end = Math.max(editTextMemo.getSelectionEnd(), 0);
-
         if (start != end) {
-            // 範囲選択されている場合はその範囲を削除
             editTextMemo.getText().delete(Math.min(start, end), Math.max(start, end));
         } else if (start > 0) {
-            // カーソルが先頭でなければ、前の1文字を削除
             editTextMemo.getText().delete(start - 1, start);
         }
     }
@@ -309,8 +287,85 @@ public class MemoEditActivity extends AppCompatActivity {
         } else if (item.getItemId() == R.id.action_voice_input) {
             checkPermissionAndStartListening();
             return true;
+        } else if (item.getItemId() == R.id.action_fix_text) {
+            showAiCorrectionDialog();
+            return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showAiCorrectionDialog() {
+        String originalText = editTextMemo.getText().toString();
+        if (originalText.trim().isEmpty()) {
+            Toast.makeText(this, "修正するテキストがありません", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_ai_correction, null);
+        TextView textOriginal = dialogView.findViewById(R.id.text_original);
+        TextView textFixed = dialogView.findViewById(R.id.text_fixed);
+        Button buttonCancel = dialogView.findViewById(R.id.button_cancel);
+        Button buttonApply = dialogView.findViewById(R.id.button_apply);
+
+        textOriginal.setText(originalText);
+        textFixed.setText("AIが修正・校正案を考えています...");
+        buttonApply.setEnabled(false);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .setCancelable(false)
+                .create();
+        dialog.show();
+
+        GeminiApiService service = ApiClient.getService();
+
+        // ★★★ プロンプトを再度修正・強化しました ★★★
+        String promptText = "あなたは自分用のメモを整理・校正する優秀なアシスタントです。\n" +
+                "以下のテキストの誤字脱字を修正した上で、読みやすく簡潔なメモ書きに変換してください。\n" +
+                "【変換ルール】\n" +
+                "1. **人名**: 「さん」「様」などの敬称は**絶対に削除せず、そのまま残す**（呼び捨て禁止）。\n" +
+                "2. **時間**: 「25時」「26時半」などの表記は、「翌1:00」「翌2:30」のように正しい時刻表記に修正する。\n" +
+                "3. **校正**: 誤字、脱字、変換ミスを修正する。\n" +
+                "4. **整理**: 挨拶（お疲れ様です、等）や無駄な言葉（えーと、等）は削除し、用件のみにする。\n" +
+                "5. **形式**: 日時と用件が分かる短い形式にする。\n" +
+                "6. **出力**: 結果のテキストのみを出力する。\n\n" +
+                "対象テキスト: " + originalText;
+
+        GeminiRequest request = new GeminiRequest();
+        Content content = new Content();
+        Part part = new Part();
+        part.setText(promptText);
+        content.setParts(Collections.singletonList(part));
+        request.setContents(Collections.singletonList(content));
+
+        Call<GeminiResponse> call = service.generateContent(GEMINI_API_KEY, request);
+        call.enqueue(new Callback<GeminiResponse>() {
+            @Override
+            public void onResponse(Call<GeminiResponse> call, Response<GeminiResponse> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    try {
+                        String fixedText = response.body().getCandidates().get(0).getContent().getParts().get(0).getText();
+                        textFixed.setText(fixedText);
+                        buttonApply.setEnabled(true);
+
+                        buttonApply.setOnClickListener(v -> {
+                            editTextMemo.setText(fixedText);
+                            dialog.dismiss();
+                        });
+                    } catch (Exception e) {
+                        textFixed.setText("修正案の取得に失敗しました。");
+                    }
+                } else {
+                    textFixed.setText("AIサーバーとの通信エラー: " + response.code());
+                }
+            }
+            @Override
+            public void onFailure(Call<GeminiResponse> call, Throwable t) {
+                textFixed.setText("エラーが発生しました: " + t.getMessage());
+            }
+        });
+
+        buttonCancel.setOnClickListener(v -> dialog.dismiss());
     }
 
     private void initializeViews() {
