@@ -52,7 +52,7 @@ import retrofit2.Response;
 public class MemoEditActivity extends AppCompatActivity {
 
     // ★★★ ここにAPIキーを入れてください ★★★
-    private static final String GEMINI_API_KEY = "AIzaSyC_qmCOhNd5YJ2rfCzfq0ZDsftVXjQaqSI";
+    private static final String GEMINI_API_KEY = "AIzaSyCQPDdpm0qrsqgLID2qtjkYVi5p6zoDX54";
 
     public static final String EXTRA_ID = "com.example.sottomemo.EXTRA_ID";
     public static final String EXTRA_EXCERPT = "com.example.sottomemo.EXTRA_EXCERPT";
@@ -311,7 +311,7 @@ public class MemoEditActivity extends AppCompatActivity {
         Button buttonApply = dialogView.findViewById(R.id.button_apply);
 
         textOriginal.setText(originalText);
-        textFixed.setText("AIが全文校正・修正・整形を行っています...");
+        textFixed.setText("AIが文章を整理整頓しています...");
         buttonApply.setEnabled(false);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -321,36 +321,32 @@ public class MemoEditActivity extends AppCompatActivity {
         dialog.show();
 
         GeminiApiService service = ApiClient.getService();
-
-        // 相対日付の計算のために現在日付を取得
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy年MM月dd日", Locale.JAPAN);
         String today = sdf.format(new Date());
 
-        // ★★★ 全機能を盛り込んだ「スーパープロンプト」 ★★★
-        String promptText = "あなたはプロの文章校正者であり、優秀な秘書です。\n" +
-                "以下の「入力テキスト」に対して、下記の【修正ルール】を全て適用し、完璧に整形されたテキストを出力してください。\n\n" +
+        // ★★★ 修正版プロンプト：「構成の分離」を指示 ★★★
+        String promptText = "あなたは優秀な秘書AIです。\n" +
+                "以下の「入力テキスト」を整理し、【感想・メモ】と【予定・タスク】に分けて出力してください。\n\n" +
                 "### 前提情報\n" +
                 "今日の日付: " + today + "\n\n" +
-                "### 修正ルール（優先度順）\n" +
-                "1. **誤字・脱字・文法修正**: \n" +
-                "   - 漢字の変換ミス、送り仮名の誤り（「行なう」→「行う」等）、ら抜き言葉、助詞の誤りを修正する。\n" +
-                "   - 音声入力特有の誤変換（「回答を開く」→「会場を開く」等）を文脈から推測して直す。\n" +
-                "2. **話し言葉のクリーニング**: \n" +
-                "   - フィラー（「えーと」「あのー」「まぁ」）を完全削除する。\n" +
-                "   - 言い直し（「明日の、いや明後日の」→「明後日の」）を整理する。\n" +
-                "3. **事実・フォーマットの正規化**: \n" +
-                "   - 深夜表記（25時、26時）は「翌1:00」「翌2:00」のように修正する。\n" +
-                "   - 数字は半角に統一する。\n" +
-                "   - 日付があやふやな場合（「来週の金曜」など）は、今日の日付を基準に「(yyyy/MM/dd)」と日付を補足する。\n" +
-                "4. **文章の構造化・簡潔化**: \n" +
-                "   - 長い文章は適切な位置で句読点を打ち、読みやすくする。\n" +
-                "   - 箇条書きが適している場合は、箇条書き形式（・）に変換する。\n" +
-                "   - 「です・ます」や「だ・である」が混在している場合、自然な敬体（です・ます）に統一する。\n" +
-                "5. **重要項目の維持**: \n" +
-                "   - 人名への敬称（さん、様）は絶対に削除しない。\n" +
-                "   - 固有名詞（iPhone, YouTube等）は正しい表記に直す。\n\n" +
-                "### 出力形式\n" +
-                "修正後のテキストのみを出力してください。（「修正しました」等の挨拶は不要）\n\n" +
+                "### 出力構成のルール（厳守）\n" +
+                "1. **前半部分（メモ・感想）**: \n" +
+                "   - 過去の出来事、日記的な感想、事実の記録などを、読みやすい常体（だ・である調、または口語）で記述する。\n" +
+                "   - 箇条書きではなく、自然な文章形式にする。\n" +
+                "2. **区切り**: \n" +
+                "   - 前半と後半の間には必ず「空行」を1行以上入れて明確に分ける。\n" +
+                "3. **後半部分（予定・タスク）**: \n" +
+                "   - 「未来に行うこと」を全て箇条書きで羅列する。\n" +
+                "   - 形式は「日時 内容」のように極めて簡潔にする（例：「来週火曜 ゴミ出し」）。\n" +
+                "   - 日付があやふやな場合は「(2025/12/23)」のように日付を補足する。\n" +
+                "4. **共通ルール**: \n" +
+                "   - 誤字脱字、深夜表記（25時→翌1時）は修正する。\n" +
+                "   - 人名の敬称は残す。\n\n" +
+                "### 出力例イメージ\n" +
+                "昨日は楽しかったな。飲みすぎて少し頭が痛い。\n\n" +
+                "来週火曜 ゴミ出し\n" +
+                "再来週水曜 15:00 佐藤さんと商談\n" +
+                "資料作成\n\n" +
                 "### 入力テキスト\n" +
                 originalText;
 
