@@ -8,11 +8,29 @@ import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
 import androidx.room.Transaction;
 import androidx.room.Update;
+import androidx.room.RoomWarnings; // 追加
+
 import java.util.List;
 
 @Dao
 public interface MemoDao {
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+
+    // ★修正: 警告を抑制するアノテーションを追加
+    @SuppressWarnings(RoomWarnings.CURSOR_MISMATCH)
+    @Transaction
+    @Query("SELECT * FROM memos ORDER BY updated_date DESC")
+    LiveData<List<MemoWithCategories>> getAllMemosWithCategories();
+
+    // ★修正: 警告を抑制するアノテーションを追加
+    @SuppressWarnings(RoomWarnings.CURSOR_MISMATCH)
+    @Transaction
+    @Query("SELECT * FROM memos INNER JOIN memo_category_cross_ref ON memos.id = memo_category_cross_ref.memoId WHERE memo_category_cross_ref.categoryId = :categoryId ORDER BY updated_date DESC")
+    LiveData<List<MemoWithCategories>> getMemosByCategoryId(long categoryId);
+
+    @Query("SELECT * FROM memos WHERE id = :id")
+    Memo getMemoById(long id);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     long insert(Memo memo);
 
     @Update
@@ -29,27 +47,4 @@ public interface MemoDao {
 
     @Query("DELETE FROM memo_category_cross_ref WHERE memoId = :memoId")
     void deleteCrossRefsForMemo(long memoId);
-
-    @Transaction
-    @Query("SELECT * FROM memo_table ORDER BY last_modified DESC")
-    LiveData<List<MemoWithCategories>> getAllMemosWithCategories();
-
-    @Transaction
-    @Query("SELECT * FROM memo_table WHERE title LIKE :searchQuery OR excerpt LIKE :searchQuery ORDER BY last_modified DESC")
-    LiveData<List<MemoWithCategories>> searchMemosWithCategories(String searchQuery);
-
-    @Transaction
-    @Query("SELECT * FROM memo_table WHERE id = :memoId")
-    LiveData<MemoWithCategories> getMemoWithCategories(long memoId);
-
-    @Transaction
-    @Query("SELECT T.* FROM memo_table AS T " +
-            "INNER JOIN memo_category_cross_ref AS C ON T.id = C.memoId " +
-            "WHERE C.categoryId = :categoryId " +
-            "ORDER BY T.last_modified DESC")
-    LiveData<List<MemoWithCategories>> getMemosByCategoryId(long categoryId);
-
-    // ★★★ このメソッドが不足していました ★★★
-    @Query("SELECT * FROM memo_table WHERE id = :memoId")
-    Memo getMemoById(long memoId);
 }

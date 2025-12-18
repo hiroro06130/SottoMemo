@@ -12,7 +12,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Database(entities = {Memo.class, Todo.class, Category.class, MemoCategoryCrossRef.class, Event.class}, version = 7, exportSchema = false)
+// ★修正: version を 8 に変更
+@Database(entities = {Memo.class, Todo.class, Category.class, MemoCategoryCrossRef.class, Event.class}, version = 8, exportSchema = false)
 public abstract class MemoRoomDatabase extends RoomDatabase {
 
     public abstract MemoDao memoDao();
@@ -30,11 +31,14 @@ public abstract class MemoRoomDatabase extends RoomDatabase {
         public void onCreate(@NonNull SupportSQLiteDatabase db) {
             super.onCreate(db);
             databaseWriteExecutor.execute(() -> {
-                // 初回起動時にダミーのカテゴリだけを作成する
-                CategoryDao categoryDao = INSTANCE.categoryDao();
-                categoryDao.insert(new Category("仕事", Color.parseColor("#A8D8C9")));
-                categoryDao.insert(new Category("プライベート", Color.parseColor("#F7CACA")));
-                categoryDao.insert(new Category("アイデア", Color.parseColor("#B7D7E8")));
+                // 初回起動時にダミーのカテゴリを作成
+                if (INSTANCE != null) {
+                    CategoryDao categoryDao = INSTANCE.categoryDao();
+                    categoryDao.deleteAll(); // 念のため全削除してから
+                    categoryDao.insert(new Category("仕事", Color.parseColor("#A8D8C9")));
+                    categoryDao.insert(new Category("プライベート", Color.parseColor("#F7CACA")));
+                    categoryDao.insert(new Category("アイデア", Color.parseColor("#B7D7E8")));
+                }
             });
         }
     };

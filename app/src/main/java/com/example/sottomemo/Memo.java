@@ -1,50 +1,42 @@
 package com.example.sottomemo;
 
-import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
+import androidx.room.ColumnInfo;
 
-@Entity(tableName = "memo_table")
+@Entity(tableName = "memos")
 public class Memo {
-
     @PrimaryKey(autoGenerate = true)
-    private long id;
-
-    @ColumnInfo(name = "title")
-    private String title;
+    public long id;
 
     @ColumnInfo(name = "excerpt")
-    private String excerpt;
+    public String excerpt;
 
-    // String型からlong型に変更
-    @ColumnInfo(name = "last_modified")
-    private long lastModified;
+    // 以前のコードとの互換性のため、updatedDateを追加
+    @ColumnInfo(name = "updated_date")
+    public long updatedDate;
 
-    // コンストラクタの引数も変更
-    public Memo(String title, String excerpt, long lastModified) {
-        this.title = title;
+    // コンストラクタ
+    public Memo(String excerpt, long updatedDate) {
         this.excerpt = excerpt;
-        this.lastModified = lastModified;
+        this.updatedDate = updatedDate;
     }
 
-    public long getId() {
-        return id;
-    }
+    // Getter / Setter
+    public long getId() { return id; }
+    public void setId(long id) { this.id = id; }
 
-    public void setId(long id) {
-        this.id = id;
-    }
+    public String getExcerpt() { return excerpt; }
 
+    // ★エラーの原因だったメソッドを追加
+    public long getUpdatedDate() { return updatedDate; }
+    public void setUpdatedDate(long updatedDate) { this.updatedDate = updatedDate; }
+
+    // getTitleメソッドも念のため追加（詳細画面などで使う場合あり）
     public String getTitle() {
-        return title;
-    }
-
-    public String getExcerpt() {
-        return excerpt;
-    }
-
-    // ゲッターも変更
-    public long getLastModified() {
-        return lastModified;
+        if (excerpt == null) return "";
+        // 最初の改行まで、または全文字をタイトルとする簡易実装
+        int index = excerpt.indexOf("\n");
+        return index > 0 ? excerpt.substring(0, index) : excerpt;
     }
 }

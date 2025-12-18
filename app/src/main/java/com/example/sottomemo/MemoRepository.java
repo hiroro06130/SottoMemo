@@ -14,7 +14,6 @@ import com.example.sottomemo.api.GeminiResponse;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 
-import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -52,7 +51,7 @@ public class MemoRepository {
         mWorkManager = WorkManager.getInstance(application);
     }
 
-    // --- メモ関連 (変更なし) ---
+    // --- メモ関連 ---
     LiveData<List<MemoWithCategories>> getAllMemosWithCategories() { return mAllMemos; }
     LiveData<List<MemoWithCategories>> getMemosByCategoryId(long categoryId) { return mMemoDao.getMemosByCategoryId(categoryId); }
 
@@ -135,7 +134,7 @@ public class MemoRepository {
         Log.d("MemoRepository", "AiAnalysisWorkerをキューに追加しました。MemoID: " + memoId);
     }
 
-    // --- ToDo・カテゴリの単純操作 (変更なし) ---
+    // --- ToDo・カテゴリ操作 ---
     LiveData<List<Todo>> getAllTodos() { return mAllTodos; }
     void insert(Todo todo) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mTodoDao.insert(todo)); }
     void update(Todo todo) { MemoRoomDatabase.databaseWriteExecutor.execute(() -> mTodoDao.update(todo)); }
@@ -148,10 +147,8 @@ public class MemoRepository {
 
     // --- Event関連 ---
     LiveData<List<Event>> getEventsForDay(long startOfDay, long endOfDay) { return mEventDao.getEventsForDay(startOfDay, endOfDay); }
+    LiveData<Event> getNextEvent() { return mEventDao.getNextEvent(System.currentTimeMillis()); }
 
-    LiveData<Event> getNextEvent() {
-        return mEventDao.getNextEvent(System.currentTimeMillis());
-    }
     void insert(Event event) {
         MemoRoomDatabase.databaseWriteExecutor.execute(() -> {
             long id = mEventDao.insert(event);
@@ -172,7 +169,7 @@ public class MemoRepository {
         });
     }
 
-    // --- AI解析のコアロジック ---
+    // --- AI解析のコアロジック（日本語フォーマット版） ---
     public void analyzeAndSaveFromWorker(long memoId) {
         Log.d(AI_DEBUG_TAG, "==================================================");
         Log.d(AI_DEBUG_TAG, "AI解析処理を開始します。対象メモID: " + memoId);
@@ -184,35 +181,39 @@ public class MemoRepository {
         SimpleDateFormat promptSdf = new SimpleDateFormat("yyyy-MM-dd", Locale.JAPAN);
         String today = promptSdf.format(new Date());
 
-        // ★★★ 抽出能力を極限まで高めたプロンプト ★★★
-        String prompt = "あなたは長文のメモからスケジュールとタスクだけを抽出する高度なAIスケジューラーです。\n" +
-                "以下の「解析対象テキスト」を読み込み、将来実行すべき「予定(events)」と「ToDo(todos)」のみをJSONで出力してください。\n" +
-                "日記、感想、過去の出来事、単なるメモ書きはノイズとして完全に無視してください。\n\n" +
+        String prompt = "あなたは優秀な秘書です。以下のメモから「スケジュール(events)」と「ToDo(todos)」を抽出し、JSON形式で出力してください。\n" +
+                "日記、感想、過去の出来事は徹底的に無視し、未来のアクションのみを抽出してください。\n\n" +
                 "### 今日の日付\n" +
                 today + "\n\n" +
-                "### 厳格な抽出ルール\n" +
-                "1. **未来のみ抽出**: 過去形（「〜した」「〜に行った」）は絶対に抽出しない。「〜する予定」「〜したい」など未来の行動のみ抽出する。\n" +
-                "2. **ノイズ除去**: 「楽しかった」「美味しかった」などの感想や、「昨日は雨だった」などの事実は無視する。\n" +
-                "3. **Event(カレンダー)の条件**: 日時が特定できるもの（「明日」「来週月曜」「12/25」など）。\n" +
-                "4. **ToDo(タスク)の条件**: 日時は不明確だが、やるべき行動（「電球を替える」「本を買う」など）。\n" +
-                "5. **深夜の正規化**: 「25時」「26時」などは「翌1:00」「翌2:00」として計算し、日付を+1日すること。\n" +
-                "6. **相対日付の計算**: 「来週の水曜」などは、今日の日付(" + today + ")を基準に正確な日付(YYYY-MM-DD)に変換すること。\n\n" +
-                "### 複雑な文章の解析例\n" +
-                "入力: 「昨日は田中さんと焼肉に行った。美味しかった。明日は10時に佐藤さんと会議があるから資料を作らなきゃ。あと、来週の土曜日は映画を見に行く予定。」\n" +
-                "思考プロセス:\n" +
-                " - 「焼肉に行った」→ 過去のことなので無視。\n" +
-                " - 「佐藤さんと会議」→ 明日10時という日時があるのでEvent。\n" +
-                " - 「資料を作る」→ 日時指定はないがやるべきことなのでToDo。\n" +
-                " - 「映画を見に行く」→ 来週土曜という日時があるのでEvent。\n" +
-                "出力: `{\"events\":[{\"summary\":\"佐藤さんと会議\",\"date\":\"(明日の日付)\",\"time\":\"10:00\"}, {\"summary\":\"映画鑑賞\",\"date\":\"(来週土曜の日付)\",\"time\":\"終日\"}], \"todos\":[{\"description\":\"会議資料を作成\"}]}`\n\n" +
-                "### 出力フォーマット\n" +
-                "JSONオブジェクトのみを出力すること。\n" +
-                "- events: [{\"summary\":String, \"date\":String(YYYY-MM-DD), \"time\":String(HH:mm or \"終日\")}]\n" +
-                "- todos: [{\"description\":String}]\n\n" +
+                "### 抽出ルール（厳守）\n" +
+                "1. **Event**: \n" +
+                "   - 日付が特定できる予定。\n" +
+                "   - **時刻**: 指定がない場合は必ず \"終日\" と出力する。\n" +
+                "   - **分離**: 場所(location)や人(people)は、summary(件名)には含めず、必ず別のフィールドに入れる。\n" +
+                "2. **ToDo**: \n" +
+                "   - やるべきタスク。期限(deadline)があれば抽出。\n" +
+                "3. **正規化**: \n" +
+                "   - 日付はYYYY-MM-DD形式。\n" +
+                "   - 深夜(25時等)は翌日の時刻に変換。\n\n" +
+                "### 解析の思考プロセス（例）\n" +
+                "入力: 「明日の13時にカフェで田中さんと打ち合わせ。あと、再来週の日曜にディズニーランドに行く。」\n" +
+                "出力:\n" +
+                "```json\n" +
+                "{\n" +
+                "  \"events\": [\n" +
+                "    {\"summary\": \"打ち合わせ\", \"date\": \"(明日の日付)\", \"time\": \"13:00\", \"location\": \"カフェ\", \"people\": \"田中さん\"},\n" +
+                "    {\"summary\": \"ディズニーランド\", \"date\": \"(再来週の日曜の日付)\", \"time\": \"終日\", \"location\": \"\", \"people\": \"\"}\n" +
+                "  ],\n" +
+                "  \"todos\": []\n" +
+                "}\n" +
+                "```\n\n" +
+                "### 本番フォーマット (JSON)\n" +
+                "{\n" +
+                "  \"events\": [{\"summary\": String, \"date\": \"YYYY-MM-DD\", \"time\": \"HH:mm\" or \"終日\", \"location\": String, \"people\": String}],\n" +
+                "  \"todos\": [{\"description\": String, \"deadline\": String}]\n" +
+                "}\n\n" +
                 "### 解析対象テキスト\n" +
                 "「" + memo.getExcerpt() + "」";
-
-        Log.d(AI_DEBUG_TAG, "[リクエスト] AIへのプロンプト:\n" + prompt);
 
         ApiClient.getService()
                 .generateContent(API_KEY, new GeminiRequest(prompt))
@@ -251,9 +252,13 @@ public class MemoRepository {
                                 if (result.todos != null) {
                                     for (AiParsedData.AiTodo aiTodo : result.todos) {
                                         if(aiTodo.description != null && !aiTodo.description.isEmpty()){
-                                            Todo newTodo = new Todo(aiTodo.description, false, currentMemoId);
+                                            String finalTitle = aiTodo.description;
+                                            if (aiTodo.deadline != null && !aiTodo.deadline.isEmpty()) {
+                                                finalTitle += " [期限: " + aiTodo.deadline + "]";
+                                            }
+
+                                            Todo newTodo = new Todo(finalTitle, false, currentMemoId);
                                             mTodoDao.insert(newTodo);
-                                            Log.d(AI_DEBUG_TAG, "抽出ToDo: " + newTodo.getTitle());
                                         }
                                     }
                                 }
@@ -261,27 +266,59 @@ public class MemoRepository {
                                 // Event保存
                                 if (result.events != null) {
                                     for (AiParsedData.AiEvent aiEvent : result.events) {
-                                        if (aiEvent.date == null || aiEvent.summary == null || aiEvent.time == null) continue;
+                                        if (aiEvent.date == null || aiEvent.summary == null) continue;
+
                                         try {
                                             Date eventDate;
-                                            String displayTime = aiEvent.time;
-                                            if ("終日".equals(aiEvent.time)) {
+                                            String displayTime = (aiEvent.time == null || aiEvent.time.isEmpty()) ? "終日" : aiEvent.time;
+
+                                            if ("終日".equals(displayTime)) {
                                                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
                                                 eventDate = sdf.parse(aiEvent.date);
                                             } else {
-                                                String dateTimeString = aiEvent.date + " " + aiEvent.time;
-                                                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
-                                                eventDate = sdf.parse(dateTimeString);
+                                                try {
+                                                    String dateTimeString = aiEvent.date + " " + displayTime;
+                                                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+                                                    eventDate = sdf.parse(dateTimeString);
+                                                } catch (ParseException e) {
+                                                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                                                    eventDate = sdf.parse(aiEvent.date);
+                                                    displayTime = "終日";
+                                                }
                                             }
+
                                             if (eventDate != null) {
-                                                Event newEvent = new Event(aiEvent.summary, displayTime, eventDate.getTime(), currentMemoId);
+                                                StringBuilder titleBuilder = new StringBuilder(aiEvent.summary);
+
+                                                // ★改良点: 日本語スタイル（・）で連結する
+                                                boolean hasExtra = false;
+                                                if ((aiEvent.people != null && !aiEvent.people.isEmpty()) ||
+                                                        (aiEvent.location != null && !aiEvent.location.isEmpty())) {
+
+                                                    titleBuilder.append("（");
+
+                                                    if (aiEvent.people != null && !aiEvent.people.isEmpty()) {
+                                                        titleBuilder.append(aiEvent.people);
+                                                        hasExtra = true;
+                                                    }
+
+                                                    if (aiEvent.location != null && !aiEvent.location.isEmpty()) {
+                                                        if (hasExtra) {
+                                                            titleBuilder.append("・");
+                                                        }
+                                                        titleBuilder.append(aiEvent.location);
+                                                    }
+
+                                                    titleBuilder.append("）");
+                                                }
+
+                                                Event newEvent = new Event(titleBuilder.toString(), displayTime, eventDate.getTime(), currentMemoId);
                                                 long id = mEventDao.insert(newEvent);
                                                 newEvent.setId(id);
                                                 ReminderManager.scheduleEventReminder(mApplication, newEvent);
-                                                Log.d(AI_DEBUG_TAG, "抽出Event: " + newEvent.getTitle() + " " + aiEvent.date);
                                             }
                                         } catch (ParseException e) {
-                                            Log.e(AI_DEBUG_TAG, "日付解析エラー", e);
+                                            Log.e(AI_DEBUG_TAG, "日付解析エラー: " + aiEvent.date, e);
                                         }
                                     }
                                 }

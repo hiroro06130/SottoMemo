@@ -24,17 +24,29 @@ import java.util.Set;
 
 public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.MemoViewHolder> {
 
-    // クリックリスナーのインターフェース
+    // クリックリスナーの定義
     public interface OnItemClickListener {
         void onItemClick(MemoWithCategories memo);
         void onItemLongClick(MemoWithCategories memo);
     }
 
     private OnItemClickListener listener;
-
-    // ★ 複数選択機能のための変数
     private boolean isMultiSelectMode = false;
-    private Set<Long> selectedMemoIds = new HashSet<>();
+    private final Set<Long> selectedMemoIds = new HashSet<>();
+
+    private static final DiffUtil.ItemCallback<MemoWithCategories> DIFF_CALLBACK = new DiffUtil.ItemCallback<MemoWithCategories>() {
+        @Override
+        public boolean areItemsTheSame(@NonNull MemoWithCategories oldItem, @NonNull MemoWithCategories newItem) {
+            return oldItem.memo.getId() == newItem.memo.getId();
+        }
+
+        @Override
+        public boolean areContentsTheSame(@NonNull MemoWithCategories oldItem, @NonNull MemoWithCategories newItem) {
+            return oldItem.memo.getExcerpt().equals(newItem.memo.getExcerpt()) &&
+                    oldItem.memo.getUpdatedDate() == newItem.memo.getUpdatedDate() &&
+                    oldItem.categories.size() == newItem.categories.size();
+        }
+    };
 
     public MemoAdapter() {
         super(DIFF_CALLBACK);
@@ -44,8 +56,7 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
         this.listener = listener;
     }
 
-    // --- 複数選択モード制御メソッド ---
-
+    // --- 複数選択モード制御 ---
     public void setMultiSelectMode(boolean enabled) {
         isMultiSelectMode = enabled;
         if (!enabled) {
@@ -82,32 +93,15 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
         notifyDataSetChanged();
     }
 
-    public boolean isSelected(long memoId) {
-        return selectedMemoIds.contains(memoId);
+    public MemoWithCategories getMemoAt(int position) {
+        return getItem(position);
     }
-
-    // ---------------------------
-
-    private static final DiffUtil.ItemCallback<MemoWithCategories> DIFF_CALLBACK = new DiffUtil.ItemCallback<MemoWithCategories>() {
-        @Override
-        public boolean areItemsTheSame(@NonNull MemoWithCategories oldItem, @NonNull MemoWithCategories newItem) {
-            return oldItem.memo.getId() == newItem.memo.getId();
-        }
-
-        @Override
-        public boolean areContentsTheSame(@NonNull MemoWithCategories oldItem, @NonNull MemoWithCategories newItem) {
-            // カテゴリの変更も検知するために簡易的な比較
-            return oldItem.memo.getExcerpt().equals(newItem.memo.getExcerpt()) &&
-                    oldItem.memo.getUpdatedDate() == newItem.memo.getUpdatedDate() &&
-                    oldItem.categories.size() == newItem.categories.size();
-        }
-    };
 
     @NonNull
     @Override
     public MemoViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View itemView = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.recyclerview_item, parent, false);
+                .inflate(R.layout.list_item_memo, parent, false);
         return new MemoViewHolder(itemView);
     }
 
@@ -117,25 +111,21 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
         holder.bind(current);
     }
 
-    // スワイプ削除などで位置からメモを取得する用
-    public MemoWithCategories getMemoAt(int position) {
-        return getItem(position);
-    }
-
     class MemoViewHolder extends RecyclerView.ViewHolder {
-        private final TextView memoItemView;
-        private final TextView dateItemView;
+        // list_item_memo.xml のIDに合わせる
+        private final TextView titleView;
+        private final TextView excerptView;
+        private final TextView dateView;
         private final ChipGroup chipGroup;
         private final MaterialCardView cardView; // 背景色変更用
 
         private MemoViewHolder(View itemView) {
             super(itemView);
-            memoItemView = itemView.findViewById(R.id.textView);
-            dateItemView = itemView.findViewById(R.id.text_date);
-            chipGroup = itemView.findViewById(R.id.chip_group_item);
+            titleView = itemView.findViewById(R.id.text_view_title);
+            excerptView = itemView.findViewById(R.id.text_view_excerpt);
+            dateView = itemView.findViewById(R.id.text_view_date);
+            chipGroup = itemView.findViewById(R.id.chip_group_item_categories);
 
-            // レイアウトにCardViewが使われている前提。もしLinearLayoutなら適切に変更してください
-            // (通常はrecyclerview_itemのルート要素)
             if (itemView instanceof MaterialCardView) {
                 cardView = (MaterialCardView) itemView;
             } else {
@@ -160,33 +150,51 @@ public class MemoAdapter extends ListAdapter<MemoWithCategories, MemoAdapter.Mem
         }
 
         public void bind(MemoWithCategories memoWithCategories) {
-            memoItemView.setText(memoWithCategories.memo.getExcerpt());
-
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault());
-            dateItemView.setText(sdf.format(memoWithCategories.memo.getUpdatedDate()));
-
-            chipGroup.removeAllViews();
-            for (Category category : memoWithCategories.categories) {
-                Chip chip = new Chip(itemView.getContext());
-                chip.setText(category.name);
-                chip.setChipBackgroundColor(android.content.res.ColorStateList.valueOf(category.color));
-                chip.setTextColor(Color.WHITE);
-                chip.setEnsureMinTouchTargetSize(false);
-                chip.setTextSize(10);
-                chipGroup.addView(chip);
+            // タイトルと本文の設定
+            // MemoクラスにgetTitle()を追加したのでそれを使う、なければ抜粋を表示
+            if (titleView != null) {
+                titleView.setText(memoWithCategories.memo.getTitle());
+            }
+            if (excerptView != null) {
+                excerptView.setText(memoWithCategories.memo.getExcerpt());
             }
 
-            // ★ 選択状態に応じた背景色の変更
+            if (dateView != null) {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault());
+                dateView.setText(sdf.format(memoWithCategories.memo.getUpdatedDate()));
+            }
+
+            if (chipGroup != null) {
+                chipGroup.removeAllViews();
+                for (Category category : memoWithCategories.categories) {
+                    Chip chip = new Chip(itemView.getContext());
+                    chip.setText(category.name);
+                    chip.setChipBackgroundColor(android.content.res.ColorStateList.valueOf(category.color));
+                    chip.setTextColor(Color.WHITE);
+                    chip.setEnsureMinTouchTargetSize(false);
+                    chip.setTextSize(10);
+                    chipGroup.addView(chip);
+                }
+            }
+
+            // 選択状態の見た目
             if (isMultiSelectMode && selectedMemoIds.contains(memoWithCategories.memo.getId())) {
-                // 選択中：少し暗い色にするか、アクセントカラーを薄く乗せる
-                itemView.setBackgroundColor(Color.LTGRAY);
-                if(cardView != null) cardView.setStrokeWidth(4);
-                if(cardView != null) cardView.setStrokeColor(Color.BLUE);
+                if (cardView != null) {
+                    cardView.setCardBackgroundColor(Color.LTGRAY);
+                    cardView.setStrokeWidth(4);
+                    cardView.setStrokeColor(Color.BLUE);
+                } else {
+                    itemView.setBackgroundColor(Color.LTGRAY);
+                }
             } else {
-                // 通常時：背景を戻す
-                itemView.setBackgroundColor(Color.WHITE); // またはテーマのデフォルト色
-                if(cardView != null) cardView.setStrokeWidth(0);
+                if (cardView != null) {
+                    // デフォルトの色に戻す（テーマ属性から取得するのが理想ですが、一旦白などで固定）
+                    cardView.setCardBackgroundColor(Color.WHITE); // 必要に応じて修正
+                    cardView.setStrokeWidth(0);
+                } else {
+                    itemView.setBackgroundColor(Color.WHITE);
+                }
             }
         }
     }
-}}
+}

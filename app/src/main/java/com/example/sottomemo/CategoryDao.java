@@ -22,6 +22,10 @@ public interface CategoryDao {
     @Delete
     void delete(Category category);
 
+    // ★修正: これを追加しないとエラーになります
+    @Query("DELETE FROM category_table")
+    void deleteAll();
+
     @Query("SELECT * FROM category_table ORDER BY name ASC")
     LiveData<List<Category>> getAllCategories();
 }
