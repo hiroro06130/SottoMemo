@@ -52,7 +52,7 @@ import retrofit2.Response;
 public class MemoEditActivity extends AppCompatActivity {
 
     // ★★★ ここにAPIキーを入れてください ★★★
-    private static final String GEMINI_API_KEY = "AIzaSyCQPDdpm0qrsqgLID2qtjkYVi5p6zoDX54";
+    private static final String GEMINI_API_KEY = "AIzaSyDh4m-_jw8wVBWGn2xK5jaHdkBM_lC9T88";
 
     public static final String EXTRA_ID = "com.example.sottomemo.EXTRA_ID";
     public static final String EXTRA_EXCERPT = "com.example.sottomemo.EXTRA_EXCERPT";
