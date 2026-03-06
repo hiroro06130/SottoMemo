@@ -24,7 +24,7 @@ import retrofit2.Response;
 public class MemoRepository {
 
     // ★★★ ここにAPIキーを入れてください ★★★
-    private static final String API_KEY = "AIzaSyDh4m-_jw8wVBWGn2xK5jaHdkBM_lC9T88";
+    private static final String API_KEY = "AIzaSyDmJqNyVk77vyrnYg8y-p12rEJ480vZsyA";
 
     private static final String AI_DEBUG_TAG = "AI_ANALYSIS";
 
